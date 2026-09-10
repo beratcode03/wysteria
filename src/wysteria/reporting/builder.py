@@ -562,6 +562,8 @@ def format_developer_report(report: DeveloperReport) -> str:
         f"Workflow: {report.workflow.display_name}",
         f"Fixture:  {report.fixture.display_name}",
     ]
+    if report.workflow_fingerprint:
+        header_lines.append(f"Fingerprint: {report.workflow_fingerprint}")
     sections.append("\n".join(header_lines))
 
     if report.status in {ReportStatus.PASSED, ReportStatus.PASS}:

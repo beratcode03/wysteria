@@ -1,0 +1,25 @@
+# Deliberately failing fixture for testing CI failure handling, developer diagnostics,
+# exit codes, and machine-readable failure report generation.
+#
+# This fixture is NOT executed by default CI, so default CI remains green.
+#
+# Usage to verify failure handling:
+#   wysteria verify examples/workflows/user_transform_flow.yaml \
+#     --fixture examples/fixtures/fixture_ci_failing.yaml \
+#     --report-file artifacts/ci-failure-report.json \
+#     --github-annotations
+#
+# Expected exit code: 1 (OUTPUT_MISMATCH)
+fixture_version: 1
+id: fixture-ci-failing
+name: CI Deliberate Output Mismatch Fixture
+inputs:
+  username: "  berat  "
+expected:
+  outputs:
+    result:
+      greeting: "Welcome, NONEXISTENT!"
+      valid: true
+  assertions:
+    check_length: true
+    assert_name_valid: true

@@ -162,6 +162,56 @@ npm test          # Runs frontend Vitest suite
 
 
 
+## CI
+
+Put my workflow + fixture + optional baseline in git, then Wysteria verifies it on every PR.
+
+### Smallest GitHub Actions Example
+
+```yaml
+name: Wysteria CI
+on: [pull_request]
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+
+      # Deterministic contract verification + PR annotations + JSON artifact
+      - run: |
+          uv run wysteria verify workflow.yaml \
+            --fixture fixture.yaml \
+            --report-file artifacts/verification-report.json \
+            --github-annotations
+
+      # Optional regression baseline check
+      - run: |
+          uv run wysteria baseline check workflow.yaml \
+            --fixture fixture.yaml \
+            --baseline baseline.json \
+            --report-file artifacts/baseline-report.json \
+            --github-annotations
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-reports
+          path: artifacts/
+```
+
+### How it works in CI
+
+- **Deterministic Verification**: Verifies workflow contracts against fixtures without external network calls or side effects.
+- **Clear PR Diagnostics**: On failure, the CI log highlights status, workflow, fixture, fingerprint, failure category, and expected vs actual values.
+- **GitHub Annotations**: `--github-annotations` emits native `::error` and `::warning` workflow commands with file/line locations for inline PR diff annotations.
+- **Machine-Readable Artifacts**: `--report-file <path>` writes the canonical `DeveloperReport` JSON artifact for post-run analysis or CI archiving.
+- **Exit Codes**: Preserves standard verification exit codes (`0` pass, `1` mismatch/assertion failure, `2` invalid workflow, `3` invalid fixture, `4` runtime error), failing the CI job when verification fails.
+
 ## Current limitations
 
 v0.1 validates contracts, executes deterministic test fixtures, and tracks regression baselines.

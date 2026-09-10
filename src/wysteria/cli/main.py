@@ -26,6 +26,7 @@ from wysteria.api import (
     compare_baseline,
     create_baseline,
     format_baseline_report,
+    format_github_annotations,
     load_baseline,
     load_fixture_document,
     load_workflow,
@@ -43,6 +44,7 @@ from wysteria.errors import (
 )
 from wysteria.ir.models import Workflow
 from wysteria.ir.versioning import CURRENT_IR_VERSION
+from wysteria.reporting import escape_github_data, format_diagnostic_annotation
 from wysteria.reporting.diagnostics import Diagnostic, Severity
 from wysteria.reporting.verification import (
     EXIT_CODES,
@@ -76,6 +78,13 @@ def validate(
         Path, typer.Argument(exists=True, readable=True, help="Workflow YAML or JSON file.")
     ],
     output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
+    github_annotations: Annotated[
+        bool,
+        typer.Option(
+            "--github-annotations",
+            help="Emit GitHub Actions workflow commands (::error, ::warning).",
+        ),
+    ] = False,
 ) -> None:
     """Validate a workflow contract without executing it."""
 
@@ -85,6 +94,8 @@ def validate(
     try:
         result = validate_workflow(load_workflow(workflow))
     except (WorkflowLoadError, WorkflowParseError) as error:
+        if github_annotations:
+            typer.echo(f"::error title=WYS900::{escape_github_data(str(error))}", err=True)
         if output_format == "json":
             typer.echo(
                 json.dumps(
@@ -105,6 +116,9 @@ def validate(
         else:
             typer.echo(f"error WYS900: {error}", err=True)
         raise typer.Exit(3) from error
+    if github_annotations:
+        for item in result.diagnostics:
+            typer.echo(format_diagnostic_annotation(item), err=True)
     _print_diagnostics(result, output_format)
     if result.valid:
         if output_format == "human":
@@ -120,6 +134,17 @@ def verify(
     ],
     fixture: Annotated[Path, typer.Option("--fixture", "-f", help="Fixture YAML or JSON file.")],
     output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
+    report_file: Annotated[
+        Path | None,
+        typer.Option("--report-file", help="Write JSON report artifact to path."),
+    ] = None,
+    github_annotations: Annotated[
+        bool,
+        typer.Option(
+            "--github-annotations",
+            help="Emit GitHub Actions workflow commands (::error, ::warning).",
+        ),
+    ] = False,
 ) -> None:
     """Verify a workflow proposal deterministically against a fixture."""
 
@@ -176,6 +201,14 @@ def verify(
         workflow_display=workflow_display,
         fixture_display=fixture_display,
     )
+
+    if report_file is not None:
+        report_file.parent.mkdir(parents=True, exist_ok=True)
+        report_file.write_text(format_verification_json(dev_report) + "\n", encoding="utf-8")
+
+    if github_annotations:
+        for ann in format_github_annotations(dev_report):
+            typer.echo(ann, err=True)
 
     if output_format == "json":
         typer.echo(format_verification_json(dev_report))
@@ -292,6 +325,17 @@ def baseline_check(
     fixture: Annotated[Path, typer.Option("--fixture", "-f", help="Fixture YAML or JSON file.")],
     baseline: Annotated[Path, typer.Option("--baseline", "-b", help="Baseline YAML or JSON file.")],
     output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
+    report_file: Annotated[
+        Path | None,
+        typer.Option("--report-file", help="Write JSON report artifact to path."),
+    ] = None,
+    github_annotations: Annotated[
+        bool,
+        typer.Option(
+            "--github-annotations",
+            help="Emit GitHub Actions workflow commands (::error, ::warning).",
+        ),
+    ] = False,
 ) -> None:
     """Compare a current verification run against an existing regression baseline."""
     if output_format not in {"human", "json"}:
@@ -301,6 +345,8 @@ def baseline_check(
     try:
         parsed_wf = load_workflow(workflow)
     except (WorkflowLoadError, WorkflowParseError) as err:
+        if github_annotations:
+            typer.echo(f"::error title=WYS900::{escape_github_data(str(err))}", err=True)
         if output_format == "json":
             typer.echo(
                 json.dumps(
@@ -315,6 +361,8 @@ def baseline_check(
     try:
         parsed_fix = load_fixture_document(fixture)
     except (FixtureLoadError, FixtureParseError) as err:
+        if github_annotations:
+            typer.echo(f"::error title=WYS700::{escape_github_data(str(err))}", err=True)
         if output_format == "json":
             typer.echo(
                 json.dumps(
@@ -329,6 +377,8 @@ def baseline_check(
     try:
         base_model = load_baseline(baseline)
     except (BaselineLoadError, BaselineParseError) as err:
+        if github_annotations:
+            typer.echo(f"::error title=WYS600::{escape_github_data(str(err))}", err=True)
         if output_format == "json":
             typer.echo(
                 json.dumps(
@@ -342,6 +392,9 @@ def baseline_check(
 
     result = verify_fixture(parsed_wf, parsed_fix)
     if result.status == VerificationStatus.INVALID_WORKFLOW:
+        if github_annotations:
+            for diag in result.diagnostics:
+                typer.echo(format_diagnostic_annotation(diag), err=True)
         if output_format == "json":
             typer.echo(
                 json.dumps(
@@ -359,6 +412,9 @@ def baseline_check(
         raise typer.Exit(2)
 
     if result.status == VerificationStatus.INVALID_FIXTURE:
+        if github_annotations:
+            for diag in result.diagnostics:
+                typer.echo(format_diagnostic_annotation(diag), err=True)
         if output_format == "json":
             typer.echo(
                 json.dumps(
@@ -376,6 +432,22 @@ def baseline_check(
         raise typer.Exit(3)
 
     comparison = compare_baseline(result, base_model)
+    dev_report = build_developer_report(
+        result,
+        workflow=parsed_wf,
+        fixture=parsed_fix,
+        workflow_display=str(workflow),
+        fixture_display=result.fixture_id or str(fixture),
+        baseline_comparison=comparison,
+    )
+
+    if report_file is not None:
+        report_file.parent.mkdir(parents=True, exist_ok=True)
+        report_file.write_text(format_verification_json(dev_report) + "\n", encoding="utf-8")
+
+    if github_annotations:
+        for ann in format_github_annotations(dev_report):
+            typer.echo(ann, err=True)
 
     if output_format == "json":
         typer.echo(json.dumps(comparison.model_dump(mode="json"), indent=2, sort_keys=True))

@@ -98,6 +98,7 @@ from wysteria.reporting import (
     build_developer_report,
     build_report,
     format_developer_report,
+    format_github_annotations,
     format_report_json,
 )
 from wysteria.reporting.diagnostics import Diagnostic, Severity, ValidationResult
@@ -396,6 +397,7 @@ __all__ = [
     "fingerprint_workflow",
     "format_baseline_report",
     "format_developer_report",
+    "format_github_annotations",
     "format_report_json",
     "load_baseline",
     "load_fixture",

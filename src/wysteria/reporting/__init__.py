@@ -17,6 +17,12 @@ from wysteria.reporting.diagnostics import (
     SourceLocation,
     ValidationResult,
 )
+from wysteria.reporting.github import (
+    escape_github_data,
+    escape_github_property,
+    format_diagnostic_annotation,
+    format_github_annotations,
+)
 from wysteria.reporting.models import (
     AssertionReportItem,
     BaselineDiffEntry,
@@ -59,8 +65,12 @@ __all__ = [
     "build_report",
     "categorize_diagnostic_code",
     "diagnostic_sort_key",
+    "escape_github_data",
+    "escape_github_property",
     "extract_node_id",
     "format_developer_report",
+    "format_diagnostic_annotation",
+    "format_github_annotations",
     "format_report_json",
     "make_status_presentation",
     "normalize_diagnostic",
