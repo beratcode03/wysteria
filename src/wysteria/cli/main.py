@@ -25,8 +25,10 @@ from wysteria.api import (
     build_developer_report,
     compare_baseline,
     create_baseline,
+    diff_workflows,
     format_baseline_report,
     format_github_annotations,
+    format_workflow_diff,
     load_baseline,
     load_fixture_document,
     load_workflow,
@@ -219,6 +221,75 @@ def verify(
     raise typer.Exit(exit_code)
 
 
+@app.command(name="diff")
+def diff_command(
+    old_workflow: Annotated[
+        Path, typer.Argument(metavar="OLD_WORKFLOW", help="Old workflow YAML or JSON file.")
+    ],
+    new_workflow: Annotated[
+        Path, typer.Argument(metavar="NEW_WORKFLOW", help="New workflow YAML or JSON file.")
+    ],
+    output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
+) -> None:
+    """Deterministically diff two workflow contracts."""
+    if output_format not in {"human", "json"}:
+        typer.echo("error WYS900: --format must be 'human' or 'json'", err=True)
+        raise typer.Exit(4)
+
+    # 1. Load and validate old workflow
+    try:
+        parsed_old = load_workflow(old_workflow)
+    except (WorkflowLoadError, WorkflowParseError) as err:
+        typer.echo(f"error WYS900: failed to load old workflow: {err}", err=True)
+        raise typer.Exit(2) from err
+    except Exception as err:
+        typer.echo(f"error: {err}", err=True)
+        raise typer.Exit(4) from err
+
+    res_old = validate_workflow(parsed_old)
+    if not res_old.valid or res_old.workflow is None:
+        for diag in res_old.diagnostics:
+            typer.echo(f"error {diag.code}: old workflow: {diag.message}", err=True)
+        raise typer.Exit(2)
+
+    # 2. Load and validate new workflow
+    try:
+        parsed_new = load_workflow(new_workflow)
+    except (WorkflowLoadError, WorkflowParseError) as err:
+        typer.echo(f"error WYS900: failed to load new workflow: {err}", err=True)
+        raise typer.Exit(3) from err
+    except Exception as err:
+        typer.echo(f"error: {err}", err=True)
+        raise typer.Exit(4) from err
+
+    res_new = validate_workflow(parsed_new)
+    if not res_new.valid or res_new.workflow is None:
+        for diag in res_new.diagnostics:
+            typer.echo(f"error {diag.code}: new workflow: {diag.message}", err=True)
+        raise typer.Exit(3)
+
+    # 3. Diff workflows
+    diff_res = diff_workflows(
+        res_old.workflow,
+        res_new.workflow,
+        old_display=str(old_workflow),
+        new_display=str(new_workflow),
+    )
+
+    # 4. Output
+    if output_format == "json":
+        typer.echo(diff_res.to_json())
+    else:
+        typer.echo(format_workflow_diff(diff_res))
+
+    # 5. Exit codes:
+    # 0 = no semantic changes
+    # 1 = changes detected
+    if diff_res.identical or not diff_res.changes:
+        raise typer.Exit(0)
+    raise typer.Exit(1)
+
+
 @app.command()
 def schema(
     ir_version: Annotated[int, typer.Option(..., "--ir-version", help="Workflow IR version.")],
@@ -324,6 +395,13 @@ def baseline_check(
     ],
     fixture: Annotated[Path, typer.Option("--fixture", "-f", help="Fixture YAML or JSON file.")],
     baseline: Annotated[Path, typer.Option("--baseline", "-b", help="Baseline YAML or JSON file.")],
+    baseline_workflow: Annotated[
+        Path | None,
+        typer.Option(
+            "--baseline-workflow",
+            help="Old workflow YAML or JSON file for semantic diffing against current workflow.",
+        ),
+    ] = None,
     output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
     report_file: Annotated[
         Path | None,
@@ -431,7 +509,54 @@ def baseline_check(
                 typer.echo(f"error {diag.code}: {diag.message}", err=True)
         raise typer.Exit(3)
 
-    comparison = compare_baseline(result, base_model)
+    parsed_base_wf = None
+    if baseline_workflow is not None:
+        try:
+            parsed_base_wf = load_workflow(baseline_workflow)
+        except (WorkflowLoadError, WorkflowParseError) as err:
+            if github_annotations:
+                typer.echo(f"::error title=WYS900::{escape_github_data(str(err))}", err=True)
+            if output_format == "json":
+                typer.echo(
+                    json.dumps(
+                        {"status": "INVALID_WORKFLOW", "matches": False, "error": str(err)},
+                        indent=2,
+                    )
+                )
+            else:
+                typer.echo(f"error WYS900: {err}", err=True)
+            raise typer.Exit(2) from err
+
+        base_wf_val = validate_workflow(parsed_base_wf)
+        if not base_wf_val.valid or base_wf_val.workflow is None:
+            if output_format == "json":
+                typer.echo(
+                    json.dumps(
+                        {
+                            "status": "INVALID_WORKFLOW",
+                            "matches": False,
+                            "diagnostics": [
+                                d.model_dump(mode="json") for d in base_wf_val.diagnostics
+                            ],
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                for diag in base_wf_val.diagnostics:
+                    typer.echo(f"error {diag.code}: {diag.message}", err=True)
+            raise typer.Exit(2)
+        parsed_base_wf = base_wf_val.workflow
+
+    curr_wf_val = validate_workflow(parsed_wf)
+    curr_wf = curr_wf_val.workflow if curr_wf_val.valid else None
+
+    comparison = compare_baseline(
+        result,
+        base_model,
+        baseline_workflow=parsed_base_wf,
+        current_workflow=curr_wf,
+    )
     dev_report = build_developer_report(
         result,
         workflow=parsed_wf,

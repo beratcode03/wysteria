@@ -6,6 +6,7 @@ import json
 import re
 from typing import TYPE_CHECKING, Any
 
+from wysteria.diff import WorkflowDiff, format_workflow_diff
 from wysteria.reporting.diagnostics import Diagnostic, Severity
 from wysteria.reporting.models import (
     AssertionReportItem,
@@ -285,6 +286,7 @@ def build_developer_report(
     workflow_display: str | None = None,
     fixture_display: str | None = None,
     baseline_comparison: BaselineComparison | None = None,
+    workflow_diff: WorkflowDiff | None = None,
 ) -> DeveloperReport:
     """Build a stable, presentation-independent DeveloperReport from a VerificationResult."""
     # 1. Workflow identity
@@ -504,6 +506,9 @@ def build_developer_report(
         _build_baseline_summary(baseline_comparison) if baseline_comparison is not None else None
     )
 
+    if workflow_diff is None and baseline_comparison is not None:
+        workflow_diff = getattr(baseline_comparison, "workflow_diff", None)
+
     # 11. Backwards compatibility copies
     actual_outputs = {k: result.actual_outputs[k] for k in sorted(result.actual_outputs.keys())}
     actual_assertions = {
@@ -528,6 +533,7 @@ def build_developer_report(
         actual_outputs=actual_outputs,
         actual_assertions=actual_assertions,
         baseline=baseline,
+        workflow_diff=workflow_diff,
     )
 
 
@@ -675,6 +681,9 @@ def format_developer_report(report: DeveloperReport) -> str:
                 diag_blocks.append("\n".join(_format_diagnostic_block(diag)))
             cat_lines.append("\n\n".join(diag_blocks))
         sections.append("\n".join(cat_lines))
+
+    if report.workflow_diff is not None and not report.workflow_diff.identical:
+        sections.append(format_workflow_diff(report.workflow_diff))
 
     return "\n\n".join(sections)
 

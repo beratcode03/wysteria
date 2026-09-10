@@ -31,6 +31,16 @@ from wysteria.baselines.storage import (
 from wysteria.baselines.storage import (
     serialize_baseline as _serialize_baseline,
 )
+from wysteria.diff import (
+    ChangeCategory,
+    DiffSeverity,
+    DiffSummary,
+    SemanticChange,
+    WorkflowDiff,
+    change_sort_key,
+    diff_workflows,
+    format_workflow_diff,
+)
 from wysteria.errors import (
     BaselineCreationError,
     BaselineError,
@@ -303,10 +313,18 @@ def load_baseline(path: str | Path) -> Baseline:
 def compare_baseline(
     result: VerificationResult,
     baseline: Baseline | None,
+    *,
+    baseline_workflow: Workflow | ParsedWorkflow | None = None,
+    current_workflow: Workflow | ParsedWorkflow | None = None,
 ) -> BaselineComparison:
     """Deterministically compare a verification result against a saved baseline."""
 
-    return _compare_baseline(result, baseline)
+    return _compare_baseline(
+        result,
+        baseline,
+        baseline_workflow=baseline_workflow,
+        current_workflow=current_workflow,
+    )
 
 
 def parse_baseline(text: str, *, filename: str = "<memory>", format: str | None = None) -> Baseline:
@@ -355,9 +373,12 @@ __all__ = [
     "BaselineParseError",
     "BaselineResult",
     "BaselineSummary",
+    "ChangeCategory",
     "DeveloperReport",
     "DiagnosticCategory",
     "DiffKind",
+    "DiffSeverity",
+    "DiffSummary",
     "ExecutionSummary",
     "Fixture",
     "FixtureExpected",
@@ -375,6 +396,7 @@ __all__ = [
     "ParsedWorkflow",
     "ReportStatus",
     "RuntimeEvaluationError",
+    "SemanticChange",
     "Severity",
     "StatusBadge",
     "StatusPresentation",
@@ -383,15 +405,18 @@ __all__ = [
     "VerificationResult",
     "VerificationStatus",
     "Workflow",
+    "WorkflowDiff",
     "WorkflowExecutionResult",
     "WorkflowIdentity",
     "WorkflowLoadError",
     "WorkflowParseError",
     "build_developer_report",
     "build_report",
+    "change_sort_key",
     "compare_baseline",
     "create_baseline",
     "create_server",
+    "diff_workflows",
     "evaluate_node",
     "evaluate_workflow",
     "fingerprint_workflow",
@@ -399,6 +424,7 @@ __all__ = [
     "format_developer_report",
     "format_github_annotations",
     "format_report_json",
+    "format_workflow_diff",
     "load_baseline",
     "load_fixture",
     "load_fixture_document",

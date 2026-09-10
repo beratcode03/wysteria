@@ -5,6 +5,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BeforeValidator, Field, field_validator
 
+from wysteria.diff.models import WorkflowDiff
 from wysteria.ir.models import StrictModel, _enum_value, _json_value
 from wysteria.verification.models import VerificationStatus
 
@@ -101,4 +102,5 @@ class BaselineComparison(StrictModel):
     output_diffs: list[OutputDiff] = Field(default_factory=list)
     assertions_changed: bool = False
     assertion_diffs: list[AssertionDiff] = Field(default_factory=list)
+    workflow_diff: WorkflowDiff | None = None
     reasons: list[str] = Field(default_factory=list)

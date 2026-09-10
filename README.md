@@ -115,6 +115,40 @@ wysteria baseline check workflow.yaml --fixture fixture.yaml --baseline baseline
 | `4` | Invalid baseline | Baseline file is missing, malformed, invalid schema/version, or destination exists on create. |
 | `5` | Runtime / infrastructure error | Runtime evaluation error or CLI infrastructure failure. |
 
+### Workflow Diff
+
+Fingerprint comparison tells you that a workflow changed.
+Semantic diff tells you **what** changed.
+
+Wysteria compares the canonical typed IR of two workflows to detect additions, removals, and modifications with deterministic severity ratings (`INFO`, `WARNING`, `BREAKING`). It operates entirely on typed contract semantics, ignoring whitespace, comment, and document key-order formatting differences.
+
+#### Diff two workflows
+
+```text
+wysteria diff old_workflow.yaml new_workflow.yaml
+wysteria diff old_workflow.yaml new_workflow.yaml --format json
+```
+
+#### Diff exit codes
+
+| Exit Code | Meaning | Description |
+|---|---|---|
+| `0` | No semantic changes | Workflows have identical semantic structure and IR representation. |
+| `1` | Changes detected | One or more semantic changes (info, warning, or breaking) were detected. |
+| `2` | Invalid old workflow | Old workflow is structurally invalid, malformed, or missing. |
+| `3` | Invalid new workflow | New workflow is structurally invalid, malformed, or missing. |
+| `4` | Runtime error | Runtime or infrastructure failure. |
+
+#### Baseline integration
+
+When checking against a baseline, optionally provide `--baseline-workflow` to automatically generate semantic diff diagnostics when workflow fingerprint changes are detected:
+
+```text
+wysteria baseline check current.yaml --fixture fixture.yaml --baseline baseline.json --baseline-workflow baseline.yaml
+```
+
+The semantic diff will be formatted in the terminal report and embedded into the `DeveloperReport` JSON artifact under `workflow_diff`.
+
 ### Developer Report Contract
 
 Wysteria provides a stable, typed, presentation-independent report model (`DeveloperReport`) that acts as the presentation contract between the verification engine and consumers:
@@ -214,10 +248,10 @@ jobs:
 
 ## Current limitations
 
-v0.1 validates contracts, executes deterministic test fixtures, and tracks regression baselines.
-Semantic diffs, adapters, plugins, LLM integration, and external side effects are intentionally out of scope.
+v0.1 validates contracts, executes deterministic test fixtures, tracks regression baselines, and computes semantic workflow diffs.
+Adapters, plugins, LLM integration, and external side effects are intentionally out of scope.
 
 ## Roadmap
 
-The next phase adds deterministic semantic diffing. Any future adapter or executor remains outside the trusted verification core.
+Deterministic semantic diffing is now implemented. Future phases explore deterministic workflow migration assistants and contract linting. Any future adapter or executor remains outside the trusted verification core.
 

@@ -1,4 +1,6 @@
-"""Deterministic baseline comparison and structured diff reporting."""
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from wysteria.baselines.models import (
     AssertionDiff,
@@ -8,14 +10,22 @@ from wysteria.baselines.models import (
     DiffKind,
     OutputDiff,
 )
+from wysteria.diff import diff_workflows, format_workflow_diff
+from wysteria.ir.models import Workflow
 from wysteria.reporting.verification import _format_value
 from wysteria.verification.evaluator import strict_equals
 from wysteria.verification.models import VerificationResult
+
+if TYPE_CHECKING:
+    from wysteria.ir.parser import ParsedWorkflow
 
 
 def compare_baseline(
     result: VerificationResult,
     baseline: Baseline | None,
+    *,
+    baseline_workflow: Workflow | ParsedWorkflow | None = None,
+    current_workflow: Workflow | ParsedWorkflow | None = None,
 ) -> BaselineComparison:
     """Deterministically compare a verification result against a saved baseline."""
     if baseline is None:
@@ -133,6 +143,23 @@ def compare_baseline(
             )
             reasons.append(f"Assertion '{key}' unexpected")
 
+    workflow_diff = None
+    if workflow_changed and baseline_workflow is not None and current_workflow is not None:
+        from wysteria.validation.schema import validate_structure
+
+        bw = (
+            baseline_workflow
+            if isinstance(baseline_workflow, Workflow)
+            else validate_structure(baseline_workflow)[0]
+        )
+        cw = (
+            current_workflow
+            if isinstance(current_workflow, Workflow)
+            else validate_structure(current_workflow)[0]
+        )
+        if bw is not None and cw is not None:
+            workflow_diff = diff_workflows(bw, cw)
+
     matches = not (
         workflow_changed
         or fixture_changed
@@ -161,6 +188,7 @@ def compare_baseline(
         output_diffs=output_diffs,
         assertions_changed=assertions_changed,
         assertion_diffs=assertion_diffs,
+        workflow_diff=workflow_diff,
         reasons=reasons,
     )
 
@@ -185,6 +213,9 @@ def format_baseline_report(comparison: BaselineComparison) -> str:
                 f"  expected: {comparison.workflow_expected}",
                 f"  actual:   {comparison.workflow_actual}",
             ]
+            if comparison.workflow_diff is not None and not comparison.workflow_diff.identical:
+                wf_lines.append("")
+                wf_lines.append(format_workflow_diff(comparison.workflow_diff))
             sections.append("\n".join(wf_lines))
 
         # 2. Fixture ID

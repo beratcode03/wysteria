@@ -8,6 +8,7 @@ from typing import Any
 
 from pydantic import Field, field_validator
 
+from wysteria.diff.models import SemanticChange, WorkflowDiff
 from wysteria.ir.models import StrictModel, _json_value
 from wysteria.reporting.diagnostics import Severity, SourceLocation
 from wysteria.verification.models import NodeExecutionTrace
@@ -231,6 +232,14 @@ class DeveloperReport(StrictModel):
 
     # Optional baseline comparison
     baseline: BaselineSummary | None = None
+
+    # Optional semantic workflow diff
+    workflow_diff: WorkflowDiff | None = None
+
+    @property
+    def semantic_changes(self) -> list[SemanticChange] | None:
+        """Alias for workflow_diff changes where available."""
+        return self.workflow_diff.changes if self.workflow_diff is not None else None
 
     @property
     def passed(self) -> bool:
