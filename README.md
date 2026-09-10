@@ -55,12 +55,39 @@ uv run ruff format --check .
 
 ## CLI
 
+### Validate a workflow
+
 ```text
 wysteria validate workflow.yaml
 wysteria validate workflow.yaml --format json
+```
+
+### Verify a workflow
+
+Verify a workflow contract deterministically against a test fixture:
+
+```text
+wysteria verify workflow.yaml --fixture fixture.yaml
+wysteria verify workflow.yaml --fixture fixture.yaml --format json
+```
+
+#### Exit codes
+
+| Exit Code | Status / Meaning | Description |
+|---|---|---|
+| `0` | `PASSED` | Verification passed successfully. |
+| `1` | `OUTPUT_MISMATCH`, `ASSERTION_FAILED` | Verification failed due to output mismatch or assertion failure. |
+| `2` | `INVALID_WORKFLOW` | Workflow is structurally invalid, malformed, or missing. |
+| `3` | `INVALID_FIXTURE` | Fixture is structurally invalid, incompatible with workflow, malformed, or missing. |
+| `4` | `RUNTIME_ERROR`, `LIMIT_EXCEEDED` | Runtime evaluation error, limit exceeded, or CLI infrastructure failure. |
+
+### Inspect schema & installation
+
+```text
 wysteria schema --ir-version 1
 wysteria doctor
 ```
+
 
 ## Current limitations
 

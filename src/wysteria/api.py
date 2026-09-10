@@ -20,7 +20,13 @@ from wysteria.fixtures.parser import (
     load_fixture as _load_fixture,
 )
 from wysteria.fixtures.parser import (
+    load_fixture_document as _load_fixture_document,
+)
+from wysteria.fixtures.parser import (
     parse_fixture as _parse_fixture,
+)
+from wysteria.fixtures.parser import (
+    parse_fixture_document as _parse_fixture_document,
 )
 from wysteria.fixtures.parser import (
     validate_fixture_structure as _validate_fixture_structure,
@@ -141,6 +147,20 @@ def load_fixture(path: str | Path) -> Fixture:
     return _load_fixture(path)
 
 
+def parse_fixture_document(
+    text: str, *, filename: str = "<memory>", format: str | None = None
+) -> ParsedFixture:
+    """Safely parse YAML or JSON fixture text into a document with source locations."""
+
+    return _parse_fixture_document(text, filename=filename, format=format)
+
+
+def load_fixture_document(path: str | Path) -> ParsedFixture:
+    """Read and safely parse a fixture file into a document with source locations."""
+
+    return _load_fixture_document(path)
+
+
 def validate_fixture_structure(parsed: ParsedFixture) -> tuple[Fixture | None, list[Diagnostic]]:
     """Validate parsed fixture document against strict Pydantic models."""
 
@@ -186,13 +206,18 @@ def strict_equals(a: Any, b: Any) -> bool:
 
 
 def verify_fixture(
-    workflow: Workflow | ParsedWorkflow,
-    fixture: Fixture | ParsedFixture,
+    workflow: Workflow | ParsedWorkflow | str | Path,
+    fixture: Fixture | ParsedFixture | str | Path,
     *,
     policy: CapabilityPolicy | None = None,
     complete_outputs: bool | None = None,
 ) -> VerificationResult:
     """Verify a workflow proposal deterministically against a fixture."""
+
+    if isinstance(workflow, (str, Path)):
+        workflow = _load_workflow(workflow)
+    if isinstance(fixture, (str, Path)):
+        fixture = _load_fixture_document(fixture)
 
     return _verify_fixture(
         workflow,
@@ -222,9 +247,11 @@ __all__ = [
     "evaluate_workflow",
     "fingerprint_workflow",
     "load_fixture",
+    "load_fixture_document",
     "load_workflow",
     "normalize_workflow",
     "parse_fixture",
+    "parse_fixture_document",
     "parse_workflow",
     "strict_equals",
     "topological_sort",

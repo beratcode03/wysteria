@@ -8,10 +8,40 @@ from typing import Annotated
 
 import typer
 
-from wysteria.api import load_workflow, validate_workflow
-from wysteria.errors import WorkflowLoadError, WorkflowParseError
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+    if hasattr(sys.stderr, "reconfigure"):
+        try:
+            sys.stderr.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
+
+from wysteria.api import (
+    load_fixture_document,
+    load_workflow,
+    validate_workflow,
+    verify_fixture,
+)
+from wysteria.errors import (
+    FixtureLoadError,
+    FixtureParseError,
+    WorkflowLoadError,
+    WorkflowParseError,
+)
 from wysteria.ir.models import Workflow
 from wysteria.ir.versioning import CURRENT_IR_VERSION
+from wysteria.reporting.diagnostics import Diagnostic, Severity
+from wysteria.reporting.verification import (
+    EXIT_CODES,
+    format_verification_json,
+    format_verification_report,
+)
+from wysteria.verification.models import VerificationResult, VerificationStatus
 
 app = typer.Typer(
     help="Deterministic verification for declarative workflow contracts.", no_args_is_help=True
@@ -73,6 +103,77 @@ def validate(
             typer.echo(f"PASS {workflow} is a valid Workflow IR v{CURRENT_IR_VERSION}")
         raise typer.Exit(0)
     raise typer.Exit(2 if result.blocked else 1)
+
+
+@app.command()
+def verify(
+    workflow: Annotated[
+        Path, typer.Argument(metavar="WORKFLOW", help="Workflow YAML or JSON file.")
+    ],
+    fixture: Annotated[Path, typer.Option("--fixture", "-f", help="Fixture YAML or JSON file.")],
+    output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
+) -> None:
+    """Verify a workflow proposal deterministically against a fixture."""
+
+    if output_format not in {"human", "json"}:
+        typer.echo("error WYS900: --format must be 'human' or 'json'", err=True)
+        raise typer.Exit(4)
+
+    parsed_wf = None
+    wf_error = None
+    try:
+        parsed_wf = load_workflow(workflow)
+    except (WorkflowLoadError, WorkflowParseError) as err:
+        wf_error = err
+
+    parsed_fix = None
+    fix_error = None
+    if wf_error is None:
+        try:
+            parsed_fix = load_fixture_document(fixture)
+        except (FixtureLoadError, FixtureParseError) as err:
+            fix_error = err
+
+    if wf_error is not None:
+        code = getattr(wf_error, "code", "WYS900")
+        result = VerificationResult(
+            status=VerificationStatus.INVALID_WORKFLOW,
+            success=False,
+            fixture_id=str(fixture.stem) if fixture else "<unknown>",
+            diagnostics=[Diagnostic(code=code, severity=Severity.ERROR, message=str(wf_error))],
+        )
+    elif fix_error is not None:
+        code = getattr(fix_error, "code", "WYS700")
+        result = VerificationResult(
+            status=VerificationStatus.INVALID_FIXTURE,
+            success=False,
+            fixture_id=str(fixture.stem) if fixture else "<unknown>",
+            diagnostics=[Diagnostic(code=code, severity=Severity.ERROR, message=str(fix_error))],
+        )
+    else:
+        assert parsed_wf is not None
+        assert parsed_fix is not None
+        result = verify_fixture(parsed_wf, parsed_fix)
+
+    if output_format == "json":
+        typer.echo(format_verification_json(result))
+    else:
+        workflow_display = str(workflow)
+        fixture_display = (
+            result.fixture_id
+            if result.fixture_id and result.fixture_id != "<unknown>"
+            else str(fixture)
+        )
+        report = format_verification_report(
+            result,
+            workflow_display=workflow_display,
+            fixture_display=fixture_display,
+            parsed_fixture=parsed_fix,
+        )
+        typer.echo(report)
+
+    exit_code = EXIT_CODES.get(result.status, 4)
+    raise typer.Exit(exit_code)
 
 
 @app.command()
