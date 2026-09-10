@@ -12,7 +12,13 @@ from wysteria.ir.parser import parse_workflow as _parse_workflow
 from wysteria.reporting.diagnostics import ValidationResult
 from wysteria.validation.capabilities import CapabilityPolicy, validate_capabilities
 from wysteria.validation.common import has_errors
-from wysteria.validation.graph import validate_graph
+from wysteria.validation.graph import (
+    GraphCycleError,
+    validate_graph,
+)
+from wysteria.validation.graph import (
+    topological_sort as _topological_sort,
+)
 from wysteria.validation.references import validate_references
 from wysteria.validation.schema import validate_structure
 from wysteria.validation.semantic import validate_semantics
@@ -67,11 +73,19 @@ def fingerprint_workflow(workflow: Workflow) -> str:
     return _fingerprint_workflow(workflow)
 
 
+def topological_sort(workflow: Workflow) -> list[str]:
+    """Return a deterministic topological ordering of node IDs."""
+
+    return _topological_sort(workflow)
+
+
 __all__ = [
+    "GraphCycleError",
     "WorkflowParseError",
     "fingerprint_workflow",
     "load_workflow",
     "normalize_workflow",
     "parse_workflow",
+    "topological_sort",
     "validate_workflow",
 ]

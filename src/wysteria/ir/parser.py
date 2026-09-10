@@ -111,6 +111,10 @@ def _check_json_depth(text: str) -> None:
                 )
         elif character in "]}":
             depth -= 1
+            if depth < 0:
+                raise _error("unmatched closing delimiter in JSON text", "WYS900")
+    if in_string:
+        raise _error("unclosed string in JSON text", "WYS900")
 
 
 def _check_yaml_scalar(node: yaml.ScalarNode) -> None:

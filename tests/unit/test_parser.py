@@ -31,3 +31,34 @@ def test_malformed_json_is_rejected():
 def test_unknown_extension_is_rejected():
     with pytest.raises(WorkflowParseError, match="format"):
         parse_workflow("{}", filename="workflow.txt")
+
+
+def test_json_depth_limit_boundary():
+    # 64 levels deep should pass the depth check (though invalid workflow schema)
+    nested_64 = '{"a": ' * 64 + "0" + "}" * 64
+    parsed = parse_workflow(nested_64, filename="workflow.json")
+    assert isinstance(parsed.data, dict)
+
+    # 65 levels deep must be rejected with WYS911
+    nested_65 = '{"a": ' * 65 + "0" + "}" * 65
+    with pytest.raises(WorkflowParseError) as exc_info:
+        parse_workflow(nested_65, filename="workflow.json")
+    assert exc_info.value.code == "WYS911"
+
+
+def test_json_depth_underflow_attack_is_rejected():
+    # Adversarial attempts to manipulate depth with closing brackets
+    with pytest.raises(WorkflowParseError) as exc_info:
+        parse_workflow('}{"ir_version": 1}', filename="workflow.json")
+    assert exc_info.value.code == "WYS900"
+    assert "unmatched closing delimiter" in str(exc_info.value)
+
+    with pytest.raises(WorkflowParseError) as exc_info:
+        parse_workflow(']{"ir_version": 1}', filename="workflow.json")
+    assert exc_info.value.code == "WYS900"
+
+
+def test_json_unclosed_string_is_rejected():
+    with pytest.raises(WorkflowParseError) as exc_info:
+        parse_workflow('{"key": "unclosed', filename="workflow.json")
+    assert exc_info.value.code == "WYS900"

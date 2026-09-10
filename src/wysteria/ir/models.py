@@ -211,15 +211,23 @@ class Capability(StrEnum):
 CapabilityField = Annotated[Capability, BeforeValidator(_enum_value(Capability))]
 
 
+MAX_NODES = 500
+MAX_EDGES = 1000
+MAX_INPUTS = 100
+MAX_OUTPUTS = 100
+MAX_ASSERTIONS = 200
+MAX_CAPABILITIES = 50
+
+
 class Workflow(StrictModel):
     """The stable v1 workflow contract."""
 
     ir_version: Literal[CURRENT_IR_VERSION]
     name: str = Field(min_length=1, pattern=r"^[A-Za-z][A-Za-z0-9_-]*$")
     metadata: Metadata = Field(default_factory=Metadata)
-    inputs: dict[str, InputSpec] = Field(default_factory=dict)
-    nodes: list[Node] = Field(min_length=1)
-    edges: list[Edge] = Field(default_factory=list)
-    capabilities: list[CapabilityField] = Field(default_factory=list)
-    assertions: list[Assertion] = Field(default_factory=list)
-    outputs: dict[str, OutputSpec] = Field(min_length=1)
+    inputs: dict[str, InputSpec] = Field(default_factory=dict, max_length=MAX_INPUTS)
+    nodes: list[Node] = Field(min_length=1, max_length=MAX_NODES)
+    edges: list[Edge] = Field(default_factory=list, max_length=MAX_EDGES)
+    capabilities: list[CapabilityField] = Field(default_factory=list, max_length=MAX_CAPABILITIES)
+    assertions: list[Assertion] = Field(default_factory=list, max_length=MAX_ASSERTIONS)
+    outputs: dict[str, OutputSpec] = Field(min_length=1, max_length=MAX_OUTPUTS)

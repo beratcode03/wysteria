@@ -33,5 +33,8 @@ def validate_structure(parsed: ParsedWorkflow) -> tuple[Workflow | None, list[Di
             elif kind == "union_tag_invalid":
                 code = "WYS103"
                 hint = "Use one of the documented deterministic node kinds."
+            elif kind in {"too_long", "string_too_long", "iterable_too_long"}:
+                code = "WYS104"
+                hint = "Reduce the collection size to stay within structural cardinality limits."
             diagnostics.append(diagnostic(code, item["msg"], path, parsed=parsed, hint=hint))
         return None, diagnostics
