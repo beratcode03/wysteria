@@ -15,3 +15,15 @@ class WorkflowParseError(WysteriaError):
 
 class WorkflowLoadError(WysteriaError):
     """Raised when a workflow document cannot be read."""
+
+
+class FixtureParseError(WysteriaError):
+    """Raised when a fixture document cannot be parsed or fails structural validation."""
+
+    def __init__(self, message: str, *, code: str = "WYS700") -> None:
+        super().__init__(message)
+        self.code = code
+
+
+class FixtureLoadError(WysteriaError):
+    """Raised when a fixture document cannot be read."""

@@ -1,12 +1,16 @@
 """Shared validation helpers."""
 
 from collections.abc import Iterable
+from typing import Protocol
 
-from wysteria.ir.parser import ParsedWorkflow
-from wysteria.reporting.diagnostics import Diagnostic, Severity
+from wysteria.reporting.diagnostics import Diagnostic, Severity, SourceLocation
 
 
-def location_for(parsed: ParsedWorkflow | None, path: str):
+class HasLocations(Protocol):
+    locations: dict[str, SourceLocation]
+
+
+def location_for(parsed: HasLocations | None, path: str):
     """Find the closest known source location for a diagnostic path."""
 
     if parsed is None:
@@ -22,7 +26,7 @@ def diagnostic(
     message: str,
     path: str = "",
     *,
-    parsed: ParsedWorkflow | None = None,
+    parsed: HasLocations | None = None,
     severity: Severity = Severity.ERROR,
     hint: str | None = None,
 ) -> Diagnostic:

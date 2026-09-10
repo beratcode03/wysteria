@@ -1,15 +1,46 @@
 """Small stable public API for loading and verifying Workflow IR."""
 
 from pathlib import Path
+from typing import Any
 
-from wysteria.errors import WorkflowParseError
+from wysteria.errors import (
+    FixtureLoadError,
+    FixtureParseError,
+    WorkflowParseError,
+)
+from wysteria.fixtures.models import (
+    CURRENT_FIXTURE_VERSION,
+    Fixture,
+    FixtureExpected,
+)
+from wysteria.fixtures.parser import (
+    ParsedFixture,
+)
+from wysteria.fixtures.parser import (
+    load_fixture as _load_fixture,
+)
+from wysteria.fixtures.parser import (
+    parse_fixture as _parse_fixture,
+)
+from wysteria.fixtures.parser import (
+    validate_fixture_structure as _validate_fixture_structure,
+)
+from wysteria.fixtures.validation import (
+    FixtureValidationResult,
+)
+from wysteria.fixtures.validation import (
+    validate_fixture as _validate_fixture,
+)
+from wysteria.fixtures.validation import (
+    validate_fixture_compatibility as _validate_fixture_compatibility,
+)
 from wysteria.ir.models import Workflow
 from wysteria.ir.normalize import fingerprint_workflow as _fingerprint_workflow
 from wysteria.ir.normalize import normalize_workflow as _normalize_workflow
 from wysteria.ir.parser import ParsedWorkflow
 from wysteria.ir.parser import load_workflow as _load_workflow
 from wysteria.ir.parser import parse_workflow as _parse_workflow
-from wysteria.reporting.diagnostics import ValidationResult
+from wysteria.reporting.diagnostics import Diagnostic, ValidationResult
 from wysteria.validation.capabilities import CapabilityPolicy, validate_capabilities
 from wysteria.validation.common import has_errors
 from wysteria.validation.graph import (
@@ -22,6 +53,25 @@ from wysteria.validation.graph import (
 from wysteria.validation.references import validate_references
 from wysteria.validation.schema import validate_structure
 from wysteria.validation.semantic import validate_semantics
+from wysteria.verification.engine import (
+    verify_fixture as _verify_fixture,
+)
+from wysteria.verification.errors import RuntimeEvaluationError
+from wysteria.verification.evaluator import (
+    evaluate_node as _evaluate_node,
+)
+from wysteria.verification.evaluator import (
+    evaluate_workflow as _evaluate_workflow,
+)
+from wysteria.verification.evaluator import (
+    strict_equals as _strict_equals,
+)
+from wysteria.verification.models import (
+    NodeExecutionTrace,
+    VerificationResult,
+    VerificationStatus,
+    WorkflowExecutionResult,
+)
 
 
 def parse_workflow(
@@ -79,13 +129,108 @@ def topological_sort(workflow: Workflow) -> list[str]:
     return _topological_sort(workflow)
 
 
+def parse_fixture(text: str, *, filename: str = "<memory>", format: str | None = None) -> Fixture:
+    """Safely parse and structurally validate YAML/JSON fixture text; raises ``FixtureParseError`` on error."""
+
+    return _parse_fixture(text, filename=filename, format=format)
+
+
+def load_fixture(path: str | Path) -> Fixture:
+    """Read and safely parse a YAML or JSON fixture file."""
+
+    return _load_fixture(path)
+
+
+def validate_fixture_structure(parsed: ParsedFixture) -> tuple[Fixture | None, list[Diagnostic]]:
+    """Validate parsed fixture document against strict Pydantic models."""
+
+    return _validate_fixture_structure(parsed)
+
+
+def validate_fixture_compatibility(
+    fixture: Fixture,
+    workflow: Workflow,
+    parsed: ParsedFixture | None = None,
+) -> list[Diagnostic]:
+    """Validate fixture compatibility against a workflow contract and return diagnostics."""
+
+    return _validate_fixture_compatibility(fixture, workflow, parsed=parsed)
+
+
+def validate_fixture(
+    fixture: Fixture,
+    workflow: Workflow,
+    parsed: ParsedFixture | None = None,
+) -> FixtureValidationResult:
+    """Validate a fixture against a workflow contract and return a structured result."""
+
+    return _validate_fixture(fixture, workflow, parsed=parsed)
+
+
+def evaluate_node(node, resolved_inputs: dict[str, Any]) -> tuple[Any, list[Diagnostic]]:
+    """Evaluate a single node deterministically against resolved inputs."""
+
+    return _evaluate_node(node, resolved_inputs)
+
+
+def evaluate_workflow(workflow: Workflow, inputs: dict[str, Any]) -> WorkflowExecutionResult:
+    """Evaluate a workflow DAG in deterministic topological order against inputs."""
+
+    return _evaluate_workflow(workflow, inputs)
+
+
+def strict_equals(a: Any, b: Any) -> bool:
+    """Compare two values for strict deterministic equality."""
+
+    return _strict_equals(a, b)
+
+
+def verify_fixture(
+    workflow: Workflow | ParsedWorkflow,
+    fixture: Fixture | ParsedFixture,
+    *,
+    policy: CapabilityPolicy | None = None,
+    complete_outputs: bool | None = None,
+) -> VerificationResult:
+    """Verify a workflow proposal deterministically against a fixture."""
+
+    return _verify_fixture(
+        workflow,
+        fixture,
+        policy=policy,
+        complete_outputs=complete_outputs,
+    )
+
+
 __all__ = [
+    "CURRENT_FIXTURE_VERSION",
+    "Fixture",
+    "FixtureExpected",
+    "FixtureLoadError",
+    "FixtureParseError",
+    "FixtureValidationResult",
     "GraphCycleError",
+    "NodeExecutionTrace",
+    "ParsedFixture",
+    "ParsedWorkflow",
+    "RuntimeEvaluationError",
+    "VerificationResult",
+    "VerificationStatus",
+    "WorkflowExecutionResult",
     "WorkflowParseError",
+    "evaluate_node",
+    "evaluate_workflow",
     "fingerprint_workflow",
+    "load_fixture",
     "load_workflow",
     "normalize_workflow",
+    "parse_fixture",
     "parse_workflow",
+    "strict_equals",
     "topological_sort",
+    "validate_fixture",
+    "validate_fixture_compatibility",
+    "validate_fixture_structure",
     "validate_workflow",
+    "verify_fixture",
 ]
