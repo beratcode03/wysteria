@@ -27,7 +27,7 @@ def escape_github_data(value: str) -> str:
 
 def normalize_file_path(path_str: str) -> str:
     """Normalize file paths to forward-slash format for GitHub Actions."""
-    p = Path(path_str)
+    p = Path(path_str.replace("\\", "/"))
     return p.as_posix()
 
 
