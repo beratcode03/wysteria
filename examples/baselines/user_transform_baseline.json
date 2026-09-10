@@ -1,0 +1,20 @@
+{
+  "baseline_version": 1,
+  "fixture_id": "fixture-trim-upper",
+  "result": {
+    "actual_assertions": {
+      "assert_name_valid": true,
+      "check_length": true
+    },
+    "actual_outputs": {
+      "result": {
+        "greeting": "Welcome, BERAT!",
+        "valid": true
+      }
+    },
+    "expected_error_code": null,
+    "status": "PASSED",
+    "success": true
+  },
+  "workflow_fingerprint": "a431d3755e3d96632bb7a089b19f484b7a2f46cbdb053e47818b27293279793c"
+}

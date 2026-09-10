@@ -387,5 +387,37 @@ def baseline_check(
     raise typer.Exit(1)
 
 
+@app.command()
+def serve(
+    host: Annotated[
+        str, typer.Option("--host", "-h", help="Bind host address (localhost only).")
+    ] = "127.0.0.1",
+    port: Annotated[int, typer.Option("--port", "-p", help="Server port number.")] = 8787,
+) -> None:
+    """Start a local deterministic verification HTTP server for frontend integration."""
+    from wysteria.server import create_server
+
+    try:
+        server = create_server(host=host, port=port)
+    except ValueError as err:
+        typer.echo(f"error: {err}", err=True)
+        raise typer.Exit(1) from err
+
+    typer.echo(f"Wysteria verification server running at http://{host}:{port}")
+    typer.echo("Endpoints:")
+    typer.echo("  GET  /api/health")
+    typer.echo("  GET  /api/scenarios")
+    typer.echo("  GET  /api/report?scenario=<id>")
+    typer.echo("  POST /api/verify")
+    typer.echo("Press Ctrl+C to stop.")
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        typer.echo("\nStopping server...")
+        server.shutdown()
+        server.server_close()
+
+
 if __name__ == "__main__":
     app()

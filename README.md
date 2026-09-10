@@ -131,6 +131,36 @@ wysteria schema --ir-version 1
 wysteria doctor
 ```
 
+### Local Web UI & Verification Server
+
+Wysteria includes a local-first web UI and deterministic verification server (`wysteria serve`) to inspect workflows, fixtures, regressions, and execution graphs locally without external network dependencies.
+
+#### Start the verification server
+
+```text
+wysteria serve
+# or custom port/host (localhost only)
+wysteria serve --host 127.0.0.1 --port 8787
+```
+
+Endpoints provided:
+- `GET /api/health`: Health status and engine version.
+- `GET /api/scenarios`: List preconfigured verification scenarios.
+- `GET /api/report?scenario=<id>`: Execute verification and return deterministic `DeveloperReport` JSON.
+- `POST /api/verify`: Execute verification dynamically given workflow, fixture, and optional baseline file paths.
+- Serves static files from `frontend/dist` as a fallback SPA when built.
+
+#### Run the frontend UI
+
+```text
+cd frontend
+npm install
+npm run dev       # Starts Vite dev server with proxy at http://localhost:5173
+npm run build     # Compiles TypeScript and production assets into frontend/dist
+npm test          # Runs frontend Vitest suite
+```
+
+
 
 ## Current limitations
 

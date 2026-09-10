@@ -1,0 +1,13 @@
+fixture_version: 1
+id: fixture-mismatch
+name: Strict Greeting Expectation
+inputs:
+  username: "  berat  "
+expected:
+  outputs:
+    result:
+      greeting: "Welcome, BERATCAN!"
+      valid: true
+  assertions:
+    check_length: true
+    assert_name_valid: true

@@ -38,6 +38,7 @@ from wysteria.errors import (
     BaselineParseError,
     FixtureLoadError,
     FixtureParseError,
+    WorkflowLoadError,
     WorkflowParseError,
 )
 from wysteria.fixtures.models import (
@@ -99,7 +100,8 @@ from wysteria.reporting import (
     format_developer_report,
     format_report_json,
 )
-from wysteria.reporting.diagnostics import Diagnostic, ValidationResult
+from wysteria.reporting.diagnostics import Diagnostic, Severity, ValidationResult
+from wysteria.server import create_server as _create_server
 from wysteria.validation.capabilities import CapabilityPolicy, validate_capabilities
 from wysteria.validation.common import has_errors
 from wysteria.validation.graph import (
@@ -324,6 +326,19 @@ def format_baseline_report(comparison: BaselineComparison) -> str:
     return _format_baseline_report(comparison)
 
 
+def create_server(
+    host: str = "127.0.0.1",
+    port: int = 8787,
+    workspace_root: str | Path | None = None,
+    scenarios: dict[str, Any] | None = None,
+):
+    """Create a local HTTP server providing deterministic verification reports."""
+    from pathlib import Path
+
+    root = Path(workspace_root) if workspace_root else None
+    return _create_server(host=host, port=port, workspace_root=root, scenarios=scenarios)
+
+
 __all__ = [
     "CURRENT_BASELINE_VERSION",
     "CURRENT_FIXTURE_VERSION",
@@ -359,19 +374,23 @@ __all__ = [
     "ParsedWorkflow",
     "ReportStatus",
     "RuntimeEvaluationError",
+    "Severity",
     "StatusBadge",
     "StatusPresentation",
     "ValidationResult",
     "ValidationSummary",
     "VerificationResult",
     "VerificationStatus",
+    "Workflow",
     "WorkflowExecutionResult",
     "WorkflowIdentity",
+    "WorkflowLoadError",
     "WorkflowParseError",
     "build_developer_report",
     "build_report",
     "compare_baseline",
     "create_baseline",
+    "create_server",
     "evaluate_node",
     "evaluate_workflow",
     "fingerprint_workflow",

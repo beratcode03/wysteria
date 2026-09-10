@@ -1,0 +1,26 @@
+ir_version: 1
+name: data_extractor
+metadata:
+  description: Select node trying to extract nested field.
+inputs:
+  payload:
+    type: object
+nodes:
+  - id: get_email
+    kind: select
+    inputs:
+      value:
+        input: payload
+    config:
+      path: "/user/contacts/email"
+    output_type: string
+edges:
+  - source: {input: payload}
+    target_node: get_email
+    target_input: value
+capabilities: []
+assertions: []
+outputs:
+  email:
+    source: {node: get_email}
+    type: string

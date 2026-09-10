@@ -1,0 +1,66 @@
+ir_version: 1
+name: user_transform_flow
+metadata:
+  description: Proposal that modifies template output, causing regression against baseline.
+inputs:
+  username:
+    type: string
+nodes:
+  - id: trim_user
+    kind: transform
+    inputs:
+      value:
+        input: username
+    config:
+      operation: trim
+    output_type: string
+  - id: uppercase_user
+    kind: transform
+    inputs:
+      value:
+        node: trim_user
+    config:
+      operation: uppercase
+    output_type: string
+  - id: check_length
+    kind: assert
+    inputs:
+      value:
+        node: uppercase_user
+    config:
+      predicate: type_is
+      expected: string
+    output_type: boolean
+  - id: package_result
+    kind: construct
+    inputs:
+      name:
+        node: uppercase_user
+    config:
+      template:
+        greeting: "Welcome, BERATCAN!"
+        valid: true
+    output_type: object
+edges:
+  - source: {input: username}
+    target_node: trim_user
+    target_input: value
+  - source: {node: trim_user}
+    target_node: uppercase_user
+    target_input: value
+  - source: {node: uppercase_user}
+    target_node: check_length
+    target_input: value
+  - source: {node: uppercase_user}
+    target_node: package_result
+    target_input: name
+capabilities: []
+assertions:
+  - id: assert_name_valid
+    source: {node: check_length}
+    predicate: equals
+    expected: true
+outputs:
+  result:
+    source: {node: package_result}
+    type: object

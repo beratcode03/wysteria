@@ -1,0 +1,13 @@
+fixture_version: 1
+id: fixture-trim-upper
+name: Trim and Uppercase User Fixture
+inputs:
+  username: "  berat  "
+expected:
+  outputs:
+    result:
+      greeting: "Welcome, BERAT!"
+      valid: true
+  assertions:
+    check_length: true
+    assert_name_valid: true

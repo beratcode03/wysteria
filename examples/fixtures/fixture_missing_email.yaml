@@ -1,0 +1,6 @@
+fixture_version: 1
+id: fixture-missing-email
+name: Empty User Object
+inputs:
+  payload:
+    user: {}
