@@ -66,6 +66,7 @@ class VerificationResult(StrictModel):
     actual_outputs: dict[str, Any] = Field(default_factory=dict)
     actual_assertions: dict[str, bool] = Field(default_factory=dict)
     traces: list[NodeExecutionTrace] = Field(default_factory=list)
+    expected_error_code: str | None = None
 
     @field_validator("actual_outputs")
     @classmethod

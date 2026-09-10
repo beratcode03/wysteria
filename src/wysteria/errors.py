@@ -27,3 +27,23 @@ class FixtureParseError(WysteriaError):
 
 class FixtureLoadError(WysteriaError):
     """Raised when a fixture document cannot be read."""
+
+
+class BaselineError(WysteriaError):
+    """Base exception for baseline operations."""
+
+
+class BaselineParseError(BaselineError):
+    """Raised when a baseline document cannot be parsed or fails structural validation."""
+
+    def __init__(self, message: str, *, code: str = "WYS600") -> None:
+        super().__init__(message)
+        self.code = code
+
+
+class BaselineLoadError(BaselineError):
+    """Raised when a baseline document cannot be read."""
+
+
+class BaselineCreationError(BaselineError):
+    """Raised when a baseline cannot be created."""

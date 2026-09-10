@@ -81,6 +81,40 @@ wysteria verify workflow.yaml --fixture fixture.yaml --format json
 | `3` | `INVALID_FIXTURE` | Fixture is structurally invalid, incompatible with workflow, malformed, or missing. |
 | `4` | `RUNTIME_ERROR`, `LIMIT_EXCEEDED` | Runtime evaluation error, limit exceeded, or CLI infrastructure failure. |
 
+### Regression Baselines
+
+Wysteria provides deterministic regression baselines to record and detect changes in workflow execution contracts across iterations. Baselines are deterministic local artifacts intended for Git version control.
+
+#### Create a baseline
+
+Create a versioned regression baseline from a successful verification run:
+
+```text
+wysteria baseline create workflow.yaml --fixture fixture.yaml --output baseline.json
+```
+
+Use `--force` to overwrite an existing baseline file.
+
+#### Check against a baseline
+
+Verify the current workflow proposal against the recorded regression baseline:
+
+```text
+wysteria baseline check workflow.yaml --fixture fixture.yaml --baseline baseline.json
+wysteria baseline check workflow.yaml --fixture fixture.yaml --baseline baseline.json --format json
+```
+
+#### Baseline exit codes
+
+| Exit Code | Meaning | Description |
+|---|---|---|
+| `0` | Baseline matches | Current verification matches the baseline regression contract. |
+| `1` | Regression detected | Output, assertion, status, error behavior, or workflow fingerprint mismatch detected. |
+| `2` | Invalid workflow | Workflow is structurally invalid, malformed, or missing. |
+| `3` | Invalid fixture | Fixture is structurally invalid, incompatible with workflow, malformed, or missing. |
+| `4` | Invalid baseline | Baseline file is missing, malformed, invalid schema/version, or destination exists on create. |
+| `5` | Runtime / infrastructure error | Runtime evaluation error or CLI infrastructure failure. |
+
 ### Inspect schema & installation
 
 ```text
@@ -91,11 +125,10 @@ wysteria doctor
 
 ## Current limitations
 
-v0.1 validates contracts only. Runtime execution, fixtures, regression baselines, semantic diffs,
-adapters, plugins, LLM integration, and external side effects are intentionally out of scope.
+v0.1 validates contracts, executes deterministic test fixtures, and tracks regression baselines.
+Semantic diffs, adapters, plugins, LLM integration, and external side effects are intentionally out of scope.
 
 ## Roadmap
 
-The next phases add a deterministic fixture-backed test runtime, regression baselines, and semantic
-diffing. Any future adapter or executor remains outside the trusted verification core.
+The next phase adds deterministic semantic diffing. Any future adapter or executor remains outside the trusted verification core.
 

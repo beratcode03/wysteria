@@ -22,12 +22,19 @@ if sys.platform == "win32":
 
 
 from wysteria.api import (
+    compare_baseline,
+    create_baseline,
+    format_baseline_report,
+    load_baseline,
     load_fixture_document,
     load_workflow,
     validate_workflow,
     verify_fixture,
 )
 from wysteria.errors import (
+    BaselineCreationError,
+    BaselineLoadError,
+    BaselineParseError,
     FixtureLoadError,
     FixtureParseError,
     WorkflowLoadError,
@@ -197,6 +204,184 @@ def doctor() -> None:
     typer.echo(f"IR versions: {CURRENT_IR_VERSION}")
     typer.echo("Trusted core: local parser, validator, and canonicalizer")
     typer.echo("External execution: disabled")
+
+
+baseline_app = typer.Typer(
+    name="baseline",
+    help="Deterministic regression baselines for verification results.",
+    no_args_is_help=True,
+)
+app.add_typer(baseline_app, name="baseline")
+
+
+@baseline_app.command(name="create")
+def baseline_create(
+    workflow: Annotated[
+        Path, typer.Argument(metavar="WORKFLOW", help="Workflow YAML or JSON file.")
+    ],
+    fixture: Annotated[Path, typer.Option("--fixture", "-f", help="Fixture YAML or JSON file.")],
+    output: Annotated[Path, typer.Option("--output", "-o", help="Baseline output file path.")],
+    force: Annotated[
+        bool, typer.Option("--force", help="Overwrite existing baseline file if it exists.")
+    ] = False,
+) -> None:
+    """Create a regression baseline from a successful verification run."""
+    try:
+        parsed_wf = load_workflow(workflow)
+    except (WorkflowLoadError, WorkflowParseError) as err:
+        typer.echo(f"error WYS900: {err}", err=True)
+        raise typer.Exit(2) from err
+
+    try:
+        parsed_fix = load_fixture_document(fixture)
+    except (FixtureLoadError, FixtureParseError) as err:
+        typer.echo(f"error WYS700: {err}", err=True)
+        raise typer.Exit(3) from err
+
+    if output.exists() and not force:
+        typer.echo(
+            f"error: baseline file already exists: {output} (use --force to overwrite)",
+            err=True,
+        )
+        raise typer.Exit(4)
+
+    result = verify_fixture(parsed_wf, parsed_fix)
+    if result.status == VerificationStatus.INVALID_WORKFLOW:
+        for diag in result.diagnostics:
+            typer.echo(f"error {diag.code}: {diag.message}", err=True)
+        raise typer.Exit(2)
+    if result.status == VerificationStatus.INVALID_FIXTURE:
+        for diag in result.diagnostics:
+            typer.echo(f"error {diag.code}: {diag.message}", err=True)
+        raise typer.Exit(3)
+    if result.status in {VerificationStatus.RUNTIME_ERROR, VerificationStatus.LIMIT_EXCEEDED}:
+        typer.echo(f"error: verification runtime error ({result.status.value})", err=True)
+        for diag in result.diagnostics:
+            typer.echo(f"  {diag.code}: {diag.message}", err=True)
+        raise typer.Exit(5)
+    if not result.success or result.status != VerificationStatus.PASSED:
+        typer.echo(
+            f"error: cannot create baseline from failing verification ({result.status.value})",
+            err=True,
+        )
+        for diag in result.diagnostics:
+            typer.echo(f"  {diag.code}: {diag.message}", err=True)
+        raise typer.Exit(1)
+
+    try:
+        create_baseline(result, output, force=force)
+    except BaselineCreationError as err:
+        typer.echo(f"error: {err}", err=True)
+        raise typer.Exit(4) from err
+    except OSError as err:
+        typer.echo(f"error: {err}", err=True)
+        raise typer.Exit(5) from err
+
+    typer.echo(f"Baseline created: {output}")
+    raise typer.Exit(0)
+
+
+@baseline_app.command(name="check")
+def baseline_check(
+    workflow: Annotated[
+        Path, typer.Argument(metavar="WORKFLOW", help="Workflow YAML or JSON file.")
+    ],
+    fixture: Annotated[Path, typer.Option("--fixture", "-f", help="Fixture YAML or JSON file.")],
+    baseline: Annotated[Path, typer.Option("--baseline", "-b", help="Baseline YAML or JSON file.")],
+    output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
+) -> None:
+    """Compare a current verification run against an existing regression baseline."""
+    if output_format not in {"human", "json"}:
+        typer.echo("error WYS900: --format must be 'human' or 'json'", err=True)
+        raise typer.Exit(5)
+
+    try:
+        parsed_wf = load_workflow(workflow)
+    except (WorkflowLoadError, WorkflowParseError) as err:
+        if output_format == "json":
+            typer.echo(
+                json.dumps(
+                    {"status": "INVALID_WORKFLOW", "matches": False, "error": str(err)},
+                    indent=2,
+                )
+            )
+        else:
+            typer.echo(f"error WYS900: {err}", err=True)
+        raise typer.Exit(2) from err
+
+    try:
+        parsed_fix = load_fixture_document(fixture)
+    except (FixtureLoadError, FixtureParseError) as err:
+        if output_format == "json":
+            typer.echo(
+                json.dumps(
+                    {"status": "INVALID_FIXTURE", "matches": False, "error": str(err)},
+                    indent=2,
+                )
+            )
+        else:
+            typer.echo(f"error WYS700: {err}", err=True)
+        raise typer.Exit(3) from err
+
+    try:
+        base_model = load_baseline(baseline)
+    except (BaselineLoadError, BaselineParseError) as err:
+        if output_format == "json":
+            typer.echo(
+                json.dumps(
+                    {"status": "INVALID_BASELINE", "matches": False, "error": str(err)},
+                    indent=2,
+                )
+            )
+        else:
+            typer.echo(f"error WYS600: {err}", err=True)
+        raise typer.Exit(4) from err
+
+    result = verify_fixture(parsed_wf, parsed_fix)
+    if result.status == VerificationStatus.INVALID_WORKFLOW:
+        if output_format == "json":
+            typer.echo(
+                json.dumps(
+                    {
+                        "status": "INVALID_WORKFLOW",
+                        "matches": False,
+                        "diagnostics": [d.model_dump(mode="json") for d in result.diagnostics],
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            for diag in result.diagnostics:
+                typer.echo(f"error {diag.code}: {diag.message}", err=True)
+        raise typer.Exit(2)
+
+    if result.status == VerificationStatus.INVALID_FIXTURE:
+        if output_format == "json":
+            typer.echo(
+                json.dumps(
+                    {
+                        "status": "INVALID_FIXTURE",
+                        "matches": False,
+                        "diagnostics": [d.model_dump(mode="json") for d in result.diagnostics],
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            for diag in result.diagnostics:
+                typer.echo(f"error {diag.code}: {diag.message}", err=True)
+        raise typer.Exit(3)
+
+    comparison = compare_baseline(result, base_model)
+
+    if output_format == "json":
+        typer.echo(json.dumps(comparison.model_dump(mode="json"), indent=2, sort_keys=True))
+    else:
+        typer.echo(format_baseline_report(comparison))
+
+    if comparison.matches:
+        raise typer.Exit(0)
+    raise typer.Exit(1)
 
 
 if __name__ == "__main__":

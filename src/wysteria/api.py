@@ -3,7 +3,39 @@
 from pathlib import Path
 from typing import Any
 
+from wysteria.baselines.comparator import (
+    compare_baseline as _compare_baseline,
+)
+from wysteria.baselines.comparator import (
+    format_baseline_report as _format_baseline_report,
+)
+from wysteria.baselines.models import (
+    CURRENT_BASELINE_VERSION,
+    AssertionDiff,
+    Baseline,
+    BaselineComparison,
+    BaselineComparisonStatus,
+    BaselineResult,
+    DiffKind,
+    OutputDiff,
+)
+from wysteria.baselines.storage import (
+    create_baseline as _create_baseline,
+)
+from wysteria.baselines.storage import (
+    load_baseline as _load_baseline,
+)
+from wysteria.baselines.storage import (
+    parse_baseline as _parse_baseline,
+)
+from wysteria.baselines.storage import (
+    serialize_baseline as _serialize_baseline,
+)
 from wysteria.errors import (
+    BaselineCreationError,
+    BaselineError,
+    BaselineLoadError,
+    BaselineParseError,
     FixtureLoadError,
     FixtureParseError,
     WorkflowParseError,
@@ -227,8 +259,63 @@ def verify_fixture(
     )
 
 
+def create_baseline(
+    result: VerificationResult,
+    path: str | Path,
+    *,
+    force: bool = False,
+) -> Baseline:
+    """Create and safely persist a regression baseline from a successful verification result."""
+
+    return _create_baseline(result, path, force=force)
+
+
+def load_baseline(path: str | Path) -> Baseline:
+    """Read, safely parse, and validate a baseline file."""
+
+    return _load_baseline(path)
+
+
+def compare_baseline(
+    result: VerificationResult,
+    baseline: Baseline | None,
+) -> BaselineComparison:
+    """Deterministically compare a verification result against a saved baseline."""
+
+    return _compare_baseline(result, baseline)
+
+
+def parse_baseline(text: str, *, filename: str = "<memory>", format: str | None = None) -> Baseline:
+    """Safely parse and validate baseline text into a Baseline model."""
+
+    return _parse_baseline(text, filename=filename, format=format)
+
+
+def serialize_baseline(baseline: Baseline) -> str:
+    """Deterministically serialize a Baseline model to canonical formatted JSON."""
+
+    return _serialize_baseline(baseline)
+
+
+def format_baseline_report(comparison: BaselineComparison) -> str:
+    """Format a deterministic structured human-readable report of baseline comparison."""
+
+    return _format_baseline_report(comparison)
+
+
 __all__ = [
+    "CURRENT_BASELINE_VERSION",
     "CURRENT_FIXTURE_VERSION",
+    "AssertionDiff",
+    "Baseline",
+    "BaselineComparison",
+    "BaselineComparisonStatus",
+    "BaselineCreationError",
+    "BaselineError",
+    "BaselineLoadError",
+    "BaselineParseError",
+    "BaselineResult",
+    "DiffKind",
     "Fixture",
     "FixtureExpected",
     "FixtureLoadError",
@@ -236,6 +323,7 @@ __all__ = [
     "FixtureValidationResult",
     "GraphCycleError",
     "NodeExecutionTrace",
+    "OutputDiff",
     "ParsedFixture",
     "ParsedWorkflow",
     "RuntimeEvaluationError",
@@ -243,16 +331,22 @@ __all__ = [
     "VerificationStatus",
     "WorkflowExecutionResult",
     "WorkflowParseError",
+    "compare_baseline",
+    "create_baseline",
     "evaluate_node",
     "evaluate_workflow",
     "fingerprint_workflow",
+    "format_baseline_report",
+    "load_baseline",
     "load_fixture",
     "load_fixture_document",
     "load_workflow",
     "normalize_workflow",
+    "parse_baseline",
     "parse_fixture",
     "parse_fixture_document",
     "parse_workflow",
+    "serialize_baseline",
     "strict_equals",
     "topological_sort",
     "validate_fixture",

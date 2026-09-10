@@ -141,6 +141,7 @@ def verify_fixture(
                     actual_outputs={},
                     actual_assertions={},
                     traces=traces,
+                    expected_error_code=expected_err_code,
                 )
             else:
                 diff_diag = Diagnostic(
@@ -158,6 +159,7 @@ def verify_fixture(
                     actual_outputs={},
                     actual_assertions={},
                     traces=traces,
+                    expected_error_code=expected_err_code,
                 )
         else:
             # Succeeded when an error was expected
@@ -176,6 +178,7 @@ def verify_fixture(
                 actual_outputs={},
                 actual_assertions={},
                 traces=traces,
+                expected_error_code=expected_err_code,
             )
 
     # If no error was expected, any runtime failure fails verification
@@ -195,6 +198,7 @@ def verify_fixture(
             actual_outputs={},
             actual_assertions={},
             traces=traces,
+            expected_error_code=None,
         )
 
     # 6. Actual Outputs Collection
@@ -351,6 +355,7 @@ def verify_fixture(
             actual_outputs=actual_outputs,
             actual_assertions=actual_assertions,
             traces=traces,
+            expected_error_code=expected_err_code,
         )
 
     return VerificationResult(
@@ -362,4 +367,5 @@ def verify_fixture(
         actual_outputs=actual_outputs,
         actual_assertions=actual_assertions,
         traces=traces,
+        expected_error_code=expected_err_code,
     )
