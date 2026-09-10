@@ -115,6 +115,15 @@ wysteria baseline check workflow.yaml --fixture fixture.yaml --baseline baseline
 | `4` | Invalid baseline | Baseline file is missing, malformed, invalid schema/version, or destination exists on create. |
 | `5` | Runtime / infrastructure error | Runtime evaluation error or CLI infrastructure failure. |
 
+### Developer Report Contract
+
+Wysteria provides a stable, typed, presentation-independent report model (`DeveloperReport`) that acts as the presentation contract between the verification engine and consumers:
+1. CLI terminal and JSON outputs
+2. Future developer web interfaces
+3. Future GitHub and CI integrations
+
+The report model normalizes diagnostics into structured records, classifies output and assertion states, summarizes execution without performance jitter, and serializes deterministically to machine-readable JSON.
+
 ### Inspect schema & installation
 
 ```text

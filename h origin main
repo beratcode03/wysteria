@@ -1,0 +1,11 @@
+ README.md                                        |   9 [32m+[m
+ docs/decisions/0006-developer-report-contract.md |  77 [32m+++[m
+ src/wysteria/__init__.py                         |  38 [32m++[m
+ src/wysteria/api.py                              |  41 [32m++[m
+ src/wysteria/cli/main.py                         |  31 [32m+[m[31m-[m
+ src/wysteria/reporting/__init__.py               |  68 [32m++[m[31m-[m
+ src/wysteria/reporting/builder.py                | 682 [32m++++++++++++++++++++++[m
+ src/wysteria/reporting/models.py                 | 253 [32m+++++++++[m
+ src/wysteria/reporting/verification.py           | 190 [32m+[m[31m------[m
+ tests/unit/test_report.py                        | 685 [32m+++++++++++++++++++++++[m
+ 10 files changed, 1892 insertions(+), 182 deletions(-)

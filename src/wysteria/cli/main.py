@@ -22,6 +22,7 @@ if sys.platform == "win32":
 
 
 from wysteria.api import (
+    build_developer_report,
     compare_baseline,
     create_baseline,
     format_baseline_report,
@@ -162,22 +163,24 @@ def verify(
         assert parsed_fix is not None
         result = verify_fixture(parsed_wf, parsed_fix)
 
+    workflow_display = str(workflow)
+    fixture_display = (
+        result.fixture_id
+        if result.fixture_id and result.fixture_id != "<unknown>"
+        else str(fixture)
+    )
+    dev_report = build_developer_report(
+        result,
+        workflow=parsed_wf,
+        fixture=parsed_fix,
+        workflow_display=workflow_display,
+        fixture_display=fixture_display,
+    )
+
     if output_format == "json":
-        typer.echo(format_verification_json(result))
+        typer.echo(format_verification_json(dev_report))
     else:
-        workflow_display = str(workflow)
-        fixture_display = (
-            result.fixture_id
-            if result.fixture_id and result.fixture_id != "<unknown>"
-            else str(fixture)
-        )
-        report = format_verification_report(
-            result,
-            workflow_display=workflow_display,
-            fixture_display=fixture_display,
-            parsed_fixture=parsed_fix,
-        )
-        typer.echo(report)
+        typer.echo(format_verification_report(dev_report))
 
     exit_code = EXIT_CODES.get(result.status, 4)
     raise typer.Exit(exit_code)

@@ -1,5 +1,67 @@
-"""Structured reporting primitives."""
+"""Structured reporting primitives and presentation models."""
 
-from wysteria.reporting.diagnostics import Diagnostic, Severity, SourceLocation, ValidationResult
+from wysteria.reporting.builder import (
+    build_developer_report,
+    build_report,
+    categorize_diagnostic_code,
+    diagnostic_sort_key,
+    extract_node_id,
+    format_developer_report,
+    format_report_json,
+    make_status_presentation,
+    normalize_diagnostic,
+)
+from wysteria.reporting.diagnostics import (
+    Diagnostic,
+    Severity,
+    SourceLocation,
+    ValidationResult,
+)
+from wysteria.reporting.models import (
+    AssertionReportItem,
+    BaselineDiffEntry,
+    BaselineSummary,
+    DeveloperReport,
+    DiagnosticCategory,
+    ExecutionSummary,
+    FixtureIdentity,
+    MatchState,
+    NormalizedDiagnostic,
+    OutputReportItem,
+    ReportStatus,
+    StatusBadge,
+    StatusPresentation,
+    ValidationSummary,
+    WorkflowIdentity,
+)
 
-__all__ = ["Diagnostic", "Severity", "SourceLocation", "ValidationResult"]
+__all__ = [
+    "AssertionReportItem",
+    "BaselineDiffEntry",
+    "BaselineSummary",
+    "DeveloperReport",
+    "Diagnostic",
+    "DiagnosticCategory",
+    "ExecutionSummary",
+    "FixtureIdentity",
+    "MatchState",
+    "NormalizedDiagnostic",
+    "OutputReportItem",
+    "ReportStatus",
+    "Severity",
+    "SourceLocation",
+    "StatusBadge",
+    "StatusPresentation",
+    "ValidationResult",
+    "ValidationSummary",
+    "WorkflowIdentity",
+    "build_developer_report",
+    "build_report",
+    "categorize_diagnostic_code",
+    "diagnostic_sort_key",
+    "extract_node_id",
+    "format_developer_report",
+    "format_report_json",
+    "make_status_presentation",
+    "normalize_diagnostic",
+]
