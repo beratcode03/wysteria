@@ -1,0 +1,23 @@
+ir_version: 1
+name: greeting
+metadata:
+  description: A deterministic example
+inputs:
+  who:
+    type: string
+nodes:
+  - id: greeting
+    kind: constant
+    inputs: {}
+    config:
+      value: hello
+    output_type: string
+edges: []
+capabilities: []
+assertions: []
+outputs:
+  message:
+    source:
+      node: greeting
+    type: string
+

@@ -1,0 +1,21 @@
+ir_version: 1
+name: invalid
+metadata: {}
+inputs: {}
+nodes:
+  - id: value
+    kind: constant
+    inputs: {}
+    config:
+      value: 1
+    output_type: integer
+    surprise: no
+edges: []
+capabilities: []
+assertions: []
+outputs:
+  result:
+    source:
+      node: value
+    type: integer
+
