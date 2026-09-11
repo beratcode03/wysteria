@@ -172,9 +172,6 @@ def validate(
     raise typer.Exit(2 if result.blocked else 1)
 
 
-
-
-
 @app.command(name="compile")
 def compile_command(
     proposal: Annotated[
@@ -1447,69 +1444,81 @@ def artifact_validate(
 def demo(
     output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
 ) -> None:
-    """Run the repository's deterministic quickstart example."""
-    examples_dir = Path("examples") / "quickstart"
+    """Run the repository's deterministic verification showcase."""
+    examples_dir = Path("examples") / "showcase"
     workflow_path = examples_dir / "workflow.yaml"
+    malicious_path = examples_dir / "malicious.yaml"
     fixture_path = examples_dir / "fixture.yaml"
     policy_path = examples_dir / "policy.yaml"
 
-    if not workflow_path.exists() or not fixture_path.exists() or not policy_path.exists():
+    if (
+        not workflow_path.exists()
+        or not malicious_path.exists()
+        or not fixture_path.exists()
+        or not policy_path.exists()
+    ):
         typer.echo(
-            "Error: Quickstart files not found. Are you running this from the repository root?",
+            "Error: Showcase files not found. Are you running this from the repository root?",
             err=True,
         )
         raise typer.Exit(1)
 
     try:
-        parsed_workflow = load_workflow(workflow_path)
-        val_result = validate_workflow(parsed_workflow)
-        if not val_result.valid or not val_result.workflow:
-            typer.echo("Error: Invalid quickstart workflow.", err=True)
-            raise typer.Exit(1)
 
-        workflow = val_result.workflow
-        fixture = load_fixture_document(fixture_path)
-        policy = load_policy(policy_path)
+        def _run_case(wf_path: Path):
+            parsed_workflow = load_workflow(wf_path)
+            fixture = load_fixture_document(fixture_path)
+            policy = load_policy(policy_path)
 
-        verify_res = verify_fixture(workflow, fixture, policy=None)
-        policy_res = evaluate_policy(workflow, policy)
+            cap_policy = CapabilityPolicy(allowed=frozenset(Capability))
 
-        from wysteria.api import build_report, format_report_json
+            val_result = validate_workflow(parsed_workflow, policy=cap_policy)
 
-        report = build_report(
-            verify_res,
-            workflow=workflow,
-            fixture=fixture,
-            policy_result=policy_res,
-        )
+            verify_res = verify_fixture(parsed_workflow, fixture, policy=cap_policy)
+
+            policy_res = None
+            if val_result.valid and val_result.workflow:
+                policy_res = evaluate_policy(val_result.workflow, policy)
+
+            dev_report = build_developer_report(
+                verify_res,
+                workflow=parsed_workflow,
+                fixture=fixture,
+                workflow_display=str(wf_path).replace("\\", "/"),
+                fixture_display=str(fixture_path).replace("\\", "/"),
+                policy_result=policy_res,
+            )
+            return dev_report
+
+        report_safe = _run_case(workflow_path)
+        report_malicious = _run_case(malicious_path)
 
         if output_format == "json":
-            typer.echo(format_report_json(report))
-            raise typer.Exit(0 if report.gate.decision == GateDecision.PASS else 1)
+            typer.echo(
+                json.dumps(
+                    [
+                        json.loads(report_safe.provenance.to_json()),
+                        json.loads(report_malicious.provenance.to_json()),
+                    ],
+                    indent=2,
+                )
+            )
+            raise typer.Exit(0)
 
-        typer.echo("Wysteria Demo\n")
+        typer.echo("Wysteria Verification Showcase\n")
 
-        typer.echo("Workflow: quickstart")
-        typer.echo(f"Verification: {report.status.value}")
+        typer.echo("Scenario 1: Validating Safe Proposal...")
+        typer.echo(
+            "AI proposes a Customer Data Enrichment pipeline (requires network.http and file.read)."
+        )
+        typer.echo(format_explanation_human(report_safe.provenance))
 
-        passed_assertions = sum(1 for a in report.assertions if a.match_state == "MATCH")
-        typer.echo(f"Assertions: {passed_assertions}/{len(report.assertions)}")
+        typer.echo("\nScenario 2: Validating Malicious Proposal...")
+        typer.echo(
+            "AI proposes a malicious update with unauthorized capabilities (process.execute)."
+        )
+        typer.echo(format_explanation_human(report_malicious.provenance))
 
-        passed_outputs = sum(1 for o in report.outputs if o.match_state == "MATCH")
-        typer.echo(f"Outputs: {passed_outputs}/{len(report.outputs)}")
-
-        policy_status = report.policy.status.value if report.policy else "PASS"
-        typer.echo(f"Policy: {policy_status}")
-
-        gate_decision = report.gate.decision.value if report.gate else "PASS"
-        typer.echo(f"Gate: {gate_decision}\n")
-
-        typer.echo("Fingerprint:")
-        typer.echo(report.workflow.fingerprint)
-
-        is_pass = gate_decision == GateDecision.PASS.value
-        if not is_pass:
-            raise typer.Exit(1)
         raise typer.Exit(0)
 
     except typer.Exit:

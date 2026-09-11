@@ -6,18 +6,17 @@ It is not a chatbot, LLM provider, workflow scheduler, browser automation tool, 
 
 ## Quickstart
 
-Get up and running and verify the built-in example in 30 seconds:
+Get up and running and verify the built-in scenario in 30 seconds:
 
 ```bash
 uv sync --all-groups
 uv run wysteria demo
 ```
 
-The output gives you a concise view of the workflow's verification state:
+The output gives you a concise view of Wysteria's policy and verification engine in action:
 
-* **PASS**: The workflow successfully parsed, matched its deterministic fixture, and met all policies.
-* **FAIL**: A syntax error, capability violation, or assertion failure was caught statically.
-* **BLOCK**: The Wysteria gating system has rejected this workflow from advancing to execution.
+* **Scenario 1 (Safe Proposal)**: AI proposes a valid data pipeline. Wysteria validates it against capabilities, evaluates it against the fixture, and allows it to **PASS**.
+* **Scenario 2 (Malicious Proposal)**: AI hallucinated a `process.execute` node. Wysteria catches the unauthorized capability during policy evaluation and immediately issues a **BLOCK**.
 
 ## Trust boundary
 

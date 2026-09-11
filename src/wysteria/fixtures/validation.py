@@ -140,15 +140,15 @@ def validate_fixture_compatibility(
                 )
             else:
                 node = node_map[node_id]
-                if node.kind != "http":
+                if node.kind not in ("http", "file_read"):
                     diagnostics.append(
                         diagnostic(
                             "WYS704",
-                            f"mock target '{node_id}' is of kind '{node.kind}', which is not mockable (only 'http' nodes can be mocked)",
+                            f"mock target '{node_id}' is of kind '{node.kind}', which is not mockable (only 'http' and 'file_read' nodes can be mocked)",
                             f"/mocks/{node_id}",
                             parsed=parsed,
                             severity=Severity.ERROR,
-                            hint="Only provide mocks for 'http' nodes.",
+                            hint="Only provide mocks for 'http' and 'file_read' nodes.",
                         )
                     )
                 else:

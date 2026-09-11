@@ -1,0 +1,18 @@
+fixture_version: 1
+id: fixture-customer-risk
+name: Mock Data for Customer Risk
+inputs:
+  customer_id: "cust_883"
+mocks:
+  fetch_customer:
+    status: "active"
+    risk_score: 12
+  read_rules:
+    threshold: 15
+expected:
+  outputs:
+    summary:
+      status: {"status": "active", "risk_score": 12}
+      threshold: {"threshold": 15}
+  assertions:
+    check_profile_exists: true

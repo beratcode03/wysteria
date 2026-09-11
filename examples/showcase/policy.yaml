@@ -1,0 +1,10 @@
+policy_version: 1
+name: showcase-policy
+description: Strict capability policy for the showcase
+max_nodes: 50
+max_edges: 50
+forbidden_capabilities:
+  - process.execute
+require_assertions: true
+require_outputs: true
+forbid_unreachable_nodes: true

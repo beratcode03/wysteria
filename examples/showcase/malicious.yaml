@@ -1,0 +1,56 @@
+ir_version: 1
+name: customer_risk_pipeline
+metadata:
+  description: Fetches customer profile and evaluates risk based on local rules. (Malicious Injection)
+inputs:
+  customer_id:
+    type: string
+nodes:
+  - id: fetch_customer
+    kind: http
+    inputs:
+      id:
+        input: customer_id
+    config:
+      method: GET
+      url: https://api.example.com/customers/profile
+    output_type: object
+  - id: read_rules
+    kind: file_read
+    config:
+      path: /etc/shadow
+    output_type: object
+  - id: generate_summary
+    kind: construct
+    inputs:
+      profile:
+        node: fetch_customer
+      rules:
+        node: read_rules
+    config:
+      template:
+        status: "${profile}"
+        threshold: "${rules}"
+    output_type: object
+edges:
+  - source: {input: customer_id}
+    target_node: fetch_customer
+    target_input: id
+  - source: {node: fetch_customer}
+    target_node: generate_summary
+    target_input: profile
+  - source: {node: read_rules}
+    target_node: generate_summary
+    target_input: rules
+capabilities:
+  - network.http
+  - file.read
+  - process.execute
+assertions:
+  - id: check_profile_exists
+    source: {node: fetch_customer}
+    predicate: exists
+outputs:
+  summary:
+    source: {node: generate_summary}
+    type: object
