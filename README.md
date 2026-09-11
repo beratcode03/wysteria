@@ -1,7 +1,5 @@
 # Wysteria
 
-**Wysteria = Yapay zekânın hazırladığı iş akışlarını gerçekten çalıştırmadan önce kontrol edip test eden bir sistem.**
-
 It is a local-first, deterministic verifier for declarative workflow contracts. It lets developers validate a workflow's structure, references, graph, capabilities, and deterministic representation before handing it to any executor.
 
 It is not a chatbot, LLM provider, workflow scheduler, browser automation tool, general workflow executor, or autonomous agent. v0.1 executes no code, shell command, SQL, HTTP request, or external side effect.

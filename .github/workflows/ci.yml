@@ -49,6 +49,12 @@ jobs:
       - name: Release readiness check
         run: uv run wysteria doctor --release
 
+      - name: Smoke test built package
+        run: |
+          uv venv smoke-env
+          ./smoke-env/bin/pip install dist/*.whl
+          ./smoke-env/bin/wysteria doctor --release
+
       - name: Create artifacts directory
         run: mkdir -p artifacts
 

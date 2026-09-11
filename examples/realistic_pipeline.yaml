@@ -1,0 +1,19 @@
+ir_version: 1
+name: realistic_data_pipeline
+nodes:
+  - id: extract
+    kind: file_read
+    output_type: string
+    config:
+      path: "data/input.csv"
+  - id: transform
+    kind: constant
+    output_type: string
+    config:
+      value: "transformed_data"
+  - id: load
+    kind: file_write
+    dependencies:
+      content: transform
+    config:
+      path: "data/output.csv"
