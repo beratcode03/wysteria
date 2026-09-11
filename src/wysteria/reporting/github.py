@@ -84,7 +84,19 @@ def format_github_annotations(report: DeveloperReport) -> list[str]:
             props = {"title": "Baseline Regression"}
             add_command("error", props, reason)
 
-    # 3. Fallback overall error annotation if report failed but no annotations were added
+    # 3. Policy violations and provenance BLOCK reasons
+    if report.policy and not report.policy.passed:
+        for v in report.policy.violations:
+            props = {"title": v.code}
+            add_command("error", props, v.message)
+
+    if report.provenance is not None:
+        for item in report.provenance.reasons:
+            if item.severity == "BLOCK" or getattr(item.severity, "value", None) == "BLOCK":
+                props = {"title": item.code or "BLOCK"}
+                add_command("error", props, item.message)
+
+    # 4. Fallback overall error annotation if report failed but no annotations were added
     if not report.success and not annotations:
         props = {"title": report.status.value}
         msg = (

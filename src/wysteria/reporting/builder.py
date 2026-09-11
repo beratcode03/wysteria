@@ -7,6 +7,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from wysteria.diff import WorkflowDiff, format_workflow_diff
+from wysteria.provenance.builder import build_provenance
 from wysteria.reporting.diagnostics import Diagnostic, Severity
 from wysteria.reporting.gate import evaluate_gate
 from wysteria.reporting.models import (
@@ -521,6 +522,21 @@ def build_developer_report(
         k: result.actual_assertions[k] for k in sorted(result.actual_assertions.keys())
     }
 
+    gate_summary = evaluate_gate(status, workflow_diff, policy_result=policy_result)
+    prov = build_provenance(
+        workflow_id=workflow_id,
+        fixture_id=fixture_id_model,
+        status=status,
+        workflow_fingerprint=result.workflow_fingerprint,
+        diagnostics=norm_diags,
+        outputs=outputs,
+        assertions=assertions,
+        baseline_summary=baseline,
+        workflow_diff=workflow_diff,
+        policy_result=policy_result,
+        gate_summary=gate_summary,
+    )
+
     return DeveloperReport(
         status=status,
         overall_status=overall_status,
@@ -541,7 +557,8 @@ def build_developer_report(
         baseline=baseline,
         workflow_diff=workflow_diff,
         policy=policy_result,
-        gate=evaluate_gate(status, workflow_diff, policy_result=policy_result),
+        gate=gate_summary,
+        provenance=prov,
     )
 
 

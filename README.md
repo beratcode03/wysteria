@@ -81,6 +81,35 @@ wysteria verify workflow.yaml --fixture fixture.yaml --format json
 | `3` | `INVALID_FIXTURE` | Fixture is structurally invalid, incompatible with workflow, malformed, or missing. |
 | `4` | `RUNTIME_ERROR`, `LIMIT_EXCEEDED` | Runtime evaluation error, limit exceeded, or CLI infrastructure failure. |
 
+### Explain a workflow decision
+
+Explain deterministically why Wysteria `PASS`, `FAIL`, or `BLOCK` a workflow:
+
+```text
+wysteria explain workflow.yaml --fixture fixture.yaml
+wysteria explain workflow.yaml --fixture fixture.yaml --policy policy.yaml
+wysteria explain workflow.yaml --fixture fixture.yaml --format json
+```
+
+#### Example Output
+
+```text
+DECISION: BLOCK
+
+Reasons:
+  BLOCK WYS453: forbidden capability "network"
+    node: fetch_data
+
+  BREAKING: output type changed
+    output: final_result
+
+  FAIL WYS852: output mismatch
+    output: final_result
+
+Fingerprint:
+  2c441b8a9f00...
+```
+
 ### Regression Baselines
 
 Wysteria provides deterministic regression baselines to record and detect changes in workflow execution contracts across iterations. Baselines are deterministic local artifacts intended for Git version control.

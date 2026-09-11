@@ -11,6 +11,14 @@ from pydantic import Field, field_validator
 from wysteria.diff.models import SemanticChange, WorkflowDiff
 from wysteria.ir.models import StrictModel, _json_value
 from wysteria.policy.models import PolicyResult
+from wysteria.provenance.models import (
+    Explanation,
+    ExplanationItem,
+    FixtureIdentity,
+    GateDecision,
+    Provenance,
+    WorkflowIdentity,
+)
 from wysteria.reporting.diagnostics import Severity, SourceLocation
 from wysteria.verification.models import NodeExecutionTrace
 
@@ -146,22 +154,6 @@ class ExecutionSummary(StrictModel):
     actual_error_code: str | None = None
 
 
-class WorkflowIdentity(StrictModel):
-    """Identity metadata for a verified workflow."""
-
-    name: str | None = None
-    fingerprint: str | None = None
-    display_name: str = ""
-
-
-class FixtureIdentity(StrictModel):
-    """Identity metadata for a test fixture."""
-
-    id: str
-    name: str | None = None
-    display_name: str = ""
-
-
 class BaselineDiffEntry(StrictModel):
     """Structured diff item comparing against a regression baseline."""
 
@@ -201,14 +193,6 @@ class BaselineSummary(StrictModel):
     assertion_diffs: list[BaselineDiffEntry] = Field(default_factory=list)
     diff_entries: list[BaselineDiffEntry] = Field(default_factory=list)
     reasons: list[str] = Field(default_factory=list)
-
-
-class GateDecision(StrEnum):
-    """Deterministic PASS/FAIL/BLOCK decision for a changed workflow."""
-
-    PASS = "PASS"
-    FAIL = "FAIL"
-    BLOCK = "BLOCK"
 
 
 class GateSummary(StrictModel):
@@ -258,6 +242,19 @@ class DeveloperReport(StrictModel):
 
     # Optional change gate decision
     gate: GateSummary | None = None
+
+    # Optional workflow provenance and explainability
+    provenance: Provenance | None = None
+
+    @property
+    def explanation(self) -> Explanation | None:
+        """Structured explanation for gating decision."""
+        return self.provenance.explanation if self.provenance is not None else None
+
+    @property
+    def reasons(self) -> list[ExplanationItem] | None:
+        """Explanation reasons for gating decision."""
+        return self.provenance.reasons if self.provenance is not None else None
 
     @property
     def semantic_changes(self) -> list[SemanticChange] | None:

@@ -22,12 +22,14 @@ if sys.platform == "win32":
 
 
 from wysteria.api import (
+    GateDecision,
     build_developer_report,
     compare_baseline,
     create_baseline,
     diff_workflows,
     evaluate_policy,
     format_baseline_report,
+    format_explanation_human,
     format_github_annotations,
     format_policy_report,
     format_workflow_diff,
@@ -244,6 +246,201 @@ def verify(
     if exit_code == 0 and policy_res is not None and not policy_res.passed:
         exit_code = 1
     raise typer.Exit(exit_code)
+
+
+@app.command()
+def explain(
+    workflow: Annotated[
+        Path, typer.Argument(metavar="WORKFLOW", help="Workflow YAML or JSON file.")
+    ],
+    fixture: Annotated[Path, typer.Option("--fixture", "-f", help="Fixture YAML or JSON file.")],
+    policy: Annotated[
+        Path | None,
+        typer.Option("--policy", "-p", help="Optional policy YAML or JSON file."),
+    ] = None,
+    baseline: Annotated[
+        Path | None,
+        typer.Option("--baseline", "-b", help="Optional baseline YAML or JSON file."),
+    ] = None,
+    baseline_workflow: Annotated[
+        Path | None,
+        typer.Option(
+            "--baseline-workflow",
+            help="Old workflow YAML or JSON file for semantic diffing.",
+        ),
+    ] = None,
+    output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
+    report_file: Annotated[
+        Path | None,
+        typer.Option("--report-file", help="Write JSON report artifact to path."),
+    ] = None,
+    github_annotations: Annotated[
+        bool,
+        typer.Option(
+            "--github-annotations",
+            help="Emit GitHub Actions workflow commands (::error, ::warning).",
+        ),
+    ] = False,
+) -> None:
+    """Explain deterministically why Wysteria PASS, FAIL, or BLOCK a workflow."""
+    if output_format not in {"human", "json"}:
+        typer.echo("error WYS900: --format must be 'human' or 'json'", err=True)
+        raise typer.Exit(4)
+
+    parsed_wf = None
+    wf_error = None
+    try:
+        parsed_wf = load_workflow(workflow)
+    except (WorkflowLoadError, WorkflowParseError) as err:
+        wf_error = err
+
+    parsed_fix = None
+    fix_error = None
+    if wf_error is None:
+        try:
+            parsed_fix = load_fixture_document(fixture)
+        except (FixtureLoadError, FixtureParseError) as err:
+            fix_error = err
+
+    if wf_error is not None:
+        code = getattr(wf_error, "code", "WYS900")
+        result = VerificationResult(
+            status=VerificationStatus.INVALID_WORKFLOW,
+            success=False,
+            fixture_id=str(fixture.stem) if fixture else "<unknown>",
+            diagnostics=[Diagnostic(code=code, severity=Severity.ERROR, message=str(wf_error))],
+        )
+    elif fix_error is not None:
+        code = getattr(fix_error, "code", "WYS700")
+        result = VerificationResult(
+            status=VerificationStatus.INVALID_FIXTURE,
+            success=False,
+            fixture_id=str(fixture.stem) if fixture else "<unknown>",
+            diagnostics=[Diagnostic(code=code, severity=Severity.ERROR, message=str(fix_error))],
+        )
+    else:
+        assert parsed_wf is not None
+        assert parsed_fix is not None
+        result = verify_fixture(parsed_wf, parsed_fix)
+
+    policy_res = None
+    if policy is not None and parsed_wf is not None:
+        try:
+            loaded_policy = load_policy(policy)
+            val_wf = validate_workflow(parsed_wf)
+            if val_wf.valid and val_wf.workflow is not None:
+                policy_res = evaluate_policy(val_wf.workflow, loaded_policy)
+        except (PolicyLoadError, PolicyParseError) as err:
+            code = getattr(err, "code", "WYS450")
+            if github_annotations:
+                typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
+            typer.echo(f"error {code}: {err}", err=True)
+            raise typer.Exit(3) from err
+
+    comparison = None
+    diff_res = None
+    if baseline is not None and parsed_wf is not None and parsed_fix is not None:
+        try:
+            loaded_baseline = load_baseline(baseline)
+        except (BaselineLoadError, BaselineParseError) as err:
+            code = getattr(err, "code", "WYS600")
+            if github_annotations:
+                typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
+            typer.echo(f"error {code}: {err}", err=True)
+            raise typer.Exit(4) from err
+
+        curr_wf_val = validate_workflow(parsed_wf)
+        curr_wf = curr_wf_val.workflow if curr_wf_val and curr_wf_val.valid else None
+
+        parsed_base_wf = None
+        if baseline_workflow is not None:
+            try:
+                base_wf_doc = load_workflow(baseline_workflow)
+                base_wf_val = validate_workflow(base_wf_doc)
+                if base_wf_val.valid and base_wf_val.workflow:
+                    parsed_base_wf = base_wf_val.workflow
+            except (WorkflowLoadError, WorkflowParseError) as err:
+                code = getattr(err, "code", "WYS900")
+                if github_annotations:
+                    typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
+                typer.echo(f"error {code}: {err}", err=True)
+                raise typer.Exit(2) from err
+
+        comparison = compare_baseline(
+            result,
+            loaded_baseline,
+            baseline_workflow=parsed_base_wf,
+            current_workflow=curr_wf,
+        )
+        diff_res = getattr(comparison, "workflow_diff", None)
+    elif baseline_workflow is not None and parsed_wf is not None:
+        try:
+            base_wf_doc = load_workflow(baseline_workflow)
+            base_wf_val = validate_workflow(base_wf_doc)
+            curr_wf_val = validate_workflow(parsed_wf)
+            if (
+                base_wf_val.valid
+                and base_wf_val.workflow
+                and curr_wf_val.valid
+                and curr_wf_val.workflow
+            ):
+                diff_res = diff_workflows(
+                    base_wf_val.workflow,
+                    curr_wf_val.workflow,
+                    old_display=str(baseline_workflow),
+                    new_display=str(workflow),
+                )
+        except (WorkflowLoadError, WorkflowParseError) as err:
+            code = getattr(err, "code", "WYS900")
+            if github_annotations:
+                typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
+            typer.echo(f"error {code}: {err}", err=True)
+            raise typer.Exit(2) from err
+
+    workflow_display = str(workflow)
+    fixture_display = (
+        result.fixture_id
+        if result.fixture_id and result.fixture_id != "<unknown>"
+        else str(fixture)
+    )
+    dev_report = build_developer_report(
+        result,
+        workflow=parsed_wf,
+        fixture=parsed_fix,
+        workflow_display=workflow_display,
+        fixture_display=fixture_display,
+        baseline_comparison=comparison,
+        workflow_diff=diff_res,
+        policy_result=policy_res,
+    )
+
+    provenance = dev_report.provenance
+    assert provenance is not None
+
+    if report_file is not None:
+        report_file.parent.mkdir(parents=True, exist_ok=True)
+        report_file.write_text(provenance.to_json() + "\n", encoding="utf-8")
+
+    if github_annotations:
+        for ann in format_github_annotations(dev_report):
+            typer.echo(ann, err=True)
+
+    if output_format == "json":
+        typer.echo(provenance.to_json())
+    else:
+        typer.echo(format_explanation_human(provenance))
+
+    gate_decision = provenance.gate_decision
+    if gate_decision == GateDecision.PASS:
+        raise typer.Exit(0)
+    elif gate_decision == GateDecision.BLOCK:
+        raise typer.Exit(1)
+    else:
+        if result.status == VerificationStatus.PASSED:
+            exit_code = 1
+        else:
+            exit_code = EXIT_CODES.get(result.status, 1)
+        raise typer.Exit(exit_code)
 
 
 @app.command(name="diff")
