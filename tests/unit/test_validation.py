@@ -84,7 +84,7 @@ def test_capability_is_default_denied(workflow_data):
     assert "WYS400" in codes(result)
 
 
-@pytest.mark.parametrize("kind", ["shell", "python", "http"])
+@pytest.mark.parametrize("kind", ["shell", "python", "sql"])
 def test_unknown_node_kind_is_rejected(workflow_data, kind):
     workflow_data["nodes"][0]["kind"] = kind
     assert "WYS103" in codes(validate(workflow_data))

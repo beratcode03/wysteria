@@ -134,6 +134,24 @@ class AssertConfig(StrictModel):
     _validate_expected = field_validator("expected")(_json_value)
 
 
+class HttpConfig(StrictModel):
+    method: Literal["GET", "POST", "PUT", "DELETE", "PATCH"]
+    url: str
+    headers: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("url")
+    @classmethod
+    def _validate_url(cls, value: str) -> str:
+        import urllib.parse
+
+        parsed = urllib.parse.urlparse(value)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError("url scheme must be http or https")
+        if parsed.hostname in ("localhost", "127.0.0.1", "::1"):
+            raise ValueError("localhost and loopback urls are not permitted")
+        return value
+
+
 class EmptyConfig(StrictModel):
     pass
 
@@ -174,8 +192,13 @@ class OutputNode(NodeBase):
     config: EmptyConfig
 
 
+class HttpNode(NodeBase):
+    kind: Literal["http"]
+    config: HttpConfig
+
+
 Node = Annotated[
-    ConstantNode | SelectNode | ConstructNode | TransformNode | AssertNode | OutputNode,
+    ConstantNode | SelectNode | ConstructNode | TransformNode | AssertNode | OutputNode | HttpNode,
     Field(discriminator="kind"),
 ]
 
