@@ -1,0 +1,12 @@
+policy_version: 1
+name: security-governance-baseline
+description: Enterprise baseline governing workflow cardinality and capability boundaries.
+max_nodes: 25
+max_edges: 50
+forbidden_capabilities:
+  - network.http
+  - process.execute
+required_capabilities: []
+require_assertions: true
+require_outputs: true
+forbid_unreachable_nodes: true

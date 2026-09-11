@@ -149,6 +149,121 @@ wysteria baseline check current.yaml --fixture fixture.yaml --baseline baseline.
 
 The semantic diff will be formatted in the terminal report and embedded into the `DeveloperReport` JSON artifact under `workflow_diff`.
 
+### Deterministic Policy Engine
+
+Wysteria includes a deterministic, side-effect-free Policy Engine to evaluate validated workflows against explicit organizational security and governance policies, producing `PASS` / `FAIL` / `BLOCK` gating semantics.
+
+#### Why Policy Evaluation is Separate from Workflow Validation
+
+- **Workflow Validation** is intrinsic to the workflow contract. It verifies that untrusted workflow documents satisfy strict schema rules, referential integrity, directed acyclicity, and type compatibility. It checks: *"Is this workflow structurally valid and executable according to Wysteria IR rules?"*
+- **Policy Evaluation** is extrinsic and organizational. It enforces governance rules, capability boundaries, size limits, and security controls defined outside the workflow document. It checks: *"Is this valid workflow permissible under our organization's governance rules?"*
+
+#### Policy File Example
+
+Policies are written in strict YAML or JSON (`policy_version: 1`):
+
+```yaml
+policy_version: 1
+name: security-governance-baseline
+description: Enterprise baseline governing workflow cardinality and capability boundaries.
+max_nodes: 25
+max_edges: 50
+forbidden_capabilities:
+  - network.http
+  - process.execute
+required_capabilities: []
+require_assertions: true
+require_outputs: true
+forbid_unreachable_nodes: true
+```
+
+#### Supported Policy Rules
+
+- `max_nodes`: Fails when total node count exceeds the limit (`WYS451`).
+- `max_edges`: Fails when total edge count exceeds the limit (`WYS452`).
+- `forbidden_capabilities`: Fails if any forbidden capability is requested (`WYS453`).
+- `required_capabilities`: Fails if a required capability is absent (`WYS454`).
+- `require_assertions`: Fails when the workflow has no assertions (`WYS455`).
+- `require_outputs`: Fails when the workflow has no outputs (`WYS456`).
+- `forbid_unreachable_nodes`: Fails when nodes cannot contribute to an output or assertion (`WYS457`).
+
+#### Check a workflow against a policy
+
+```text
+wysteria policy check workflow.yaml --policy policy.yaml
+wysteria policy check workflow.yaml --policy policy.yaml --format json
+```
+
+#### Policy Check Exit Codes
+
+| Exit Code | Meaning | Description |
+|---|---|---|
+| `0` | `PASS` | Policy evaluation passed with no violations. |
+| `1` | `BLOCK` | One or more policy violations detected. |
+| `2` | Invalid workflow | Workflow is structurally invalid, malformed, or missing. |
+| `3` | Invalid policy | Policy document is invalid, malformed, has unknown fields, or is missing. |
+| `4` | Runtime / CLI error | Unsupported format or execution error. |
+
+#### Gate Integration & PASS / FAIL / BLOCK Semantics
+
+The final gate integrates verification status, semantic workflow diff, and policy evaluation into a unified `GateDecision`:
+
+```text
+verification status
++ semantic workflow diff
++ policy result
+→ final GateDecision (PASS / FAIL / BLOCK)
+```
+
+- **`PASS`**: Verification succeeds, semantic changes (if any) are purely informational, and policy evaluation passes.
+- **`FAIL`**: Verification fails (output mismatch, assertion failure, runtime limit exceeded) or non-informational/breaking diff is detected without policy violations.
+- **`BLOCK`**: Policy evaluation fails. Policy violations represent governance/security blocks and take precedence over ordinary test failures.
+
+Informational metadata changes never cause policy failures or gate blocks.
+
+#### Example Terminal Output
+
+##### Policy Check (PASS):
+```text
+Wysteria Policy Check
+Workflow: workflow.yaml
+Policy: security_policy.yaml
+
+Result
+  ✓ PASS
+  All policy checks passed.
+```
+
+##### Policy Check (BLOCK):
+```text
+Wysteria Policy Check
+Workflow: workflow.yaml
+Policy: security_policy.yaml
+
+Result
+  ✗ BLOCK
+
+Violations
+  ✗ WYS453 (forbidden_capabilities)
+    Capability: network.http
+    Path: [/capabilities/0]
+    forbidden capability requested: 'network.http'
+  ✗ WYS457 (forbid_unreachable_nodes)
+    Node: orphan_node
+    Path: [/nodes/2]
+    node 'orphan_node' cannot contribute to an output or assertion
+```
+
+##### Gated Verification Report (with `--policy`):
+```text
+Result
+  ✓ PASS
+
+Gate Decision
+  ✗ BLOCK
+    - policy violation (forbidden_capabilities): forbidden capability requested: 'network.http'
+```
+
 ### Developer Report Contract
 
 Wysteria provides a stable, typed, presentation-independent report model (`DeveloperReport`) that acts as the presentation contract between the verification engine and consumers:

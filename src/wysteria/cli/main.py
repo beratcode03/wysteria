@@ -26,11 +26,14 @@ from wysteria.api import (
     compare_baseline,
     create_baseline,
     diff_workflows,
+    evaluate_policy,
     format_baseline_report,
     format_github_annotations,
+    format_policy_report,
     format_workflow_diff,
     load_baseline,
     load_fixture_document,
+    load_policy,
     load_workflow,
     validate_workflow,
     verify_fixture,
@@ -41,10 +44,12 @@ from wysteria.errors import (
     BaselineParseError,
     FixtureLoadError,
     FixtureParseError,
+    PolicyLoadError,
+    PolicyParseError,
     WorkflowLoadError,
     WorkflowParseError,
 )
-from wysteria.ir.models import Workflow
+from wysteria.ir.models import Capability, Workflow
 from wysteria.ir.versioning import CURRENT_IR_VERSION
 from wysteria.reporting import escape_github_data, format_diagnostic_annotation
 from wysteria.reporting.diagnostics import Diagnostic, Severity
@@ -53,6 +58,7 @@ from wysteria.reporting.verification import (
     format_verification_json,
     format_verification_report,
 )
+from wysteria.validation.capabilities import CapabilityPolicy
 from wysteria.verification.models import VerificationResult, VerificationStatus
 
 app = typer.Typer(
@@ -135,6 +141,10 @@ def verify(
         Path, typer.Argument(metavar="WORKFLOW", help="Workflow YAML or JSON file.")
     ],
     fixture: Annotated[Path, typer.Option("--fixture", "-f", help="Fixture YAML or JSON file.")],
+    policy: Annotated[
+        Path | None,
+        typer.Option("--policy", "-p", help="Optional policy YAML or JSON file."),
+    ] = None,
     output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
     report_file: Annotated[
         Path | None,
@@ -190,6 +200,18 @@ def verify(
         assert parsed_fix is not None
         result = verify_fixture(parsed_wf, parsed_fix)
 
+    policy_res = None
+    if policy is not None and result.status == VerificationStatus.PASSED and parsed_wf is not None:
+        try:
+            loaded_policy = load_policy(policy)
+            val_wf = validate_workflow(parsed_wf)
+            if val_wf.valid and val_wf.workflow is not None:
+                policy_res = evaluate_policy(val_wf.workflow, loaded_policy)
+        except (PolicyLoadError, PolicyParseError) as err:
+            code = getattr(err, "code", "WYS450")
+            typer.echo(f"error {code}: {err}", err=True)
+            raise typer.Exit(3) from err
+
     workflow_display = str(workflow)
     fixture_display = (
         result.fixture_id
@@ -202,6 +224,7 @@ def verify(
         fixture=parsed_fix,
         workflow_display=workflow_display,
         fixture_display=fixture_display,
+        policy_result=policy_res,
     )
 
     if report_file is not None:
@@ -218,6 +241,8 @@ def verify(
         typer.echo(format_verification_report(dev_report))
 
     exit_code = EXIT_CODES.get(result.status, 4)
+    if exit_code == 0 and policy_res is not None and not policy_res.passed:
+        exit_code = 1
     raise typer.Exit(exit_code)
 
 
@@ -580,6 +605,132 @@ def baseline_check(
         typer.echo(format_baseline_report(comparison))
 
     if comparison.matches:
+        raise typer.Exit(0)
+    raise typer.Exit(1)
+
+
+policy_app = typer.Typer(
+    help="Evaluate deterministic policies against declarative workflows.",
+    no_args_is_help=True,
+)
+app.add_typer(policy_app, name="policy")
+
+
+@policy_app.command(name="check")
+def policy_check(
+    workflow: Annotated[
+        Path, typer.Argument(metavar="WORKFLOW", help="Workflow YAML or JSON file.")
+    ],
+    policy: Annotated[Path, typer.Option("--policy", "-p", help="Policy YAML or JSON file.")],
+    output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
+    report_file: Annotated[
+        Path | None,
+        typer.Option("--report-file", help="Write JSON policy artifact to path."),
+    ] = None,
+    github_annotations: Annotated[
+        bool,
+        typer.Option(
+            "--github-annotations",
+            help="Emit GitHub Actions workflow commands (::error, ::warning).",
+        ),
+    ] = False,
+) -> None:
+    """Evaluate a validated workflow against an explicit policy."""
+    if output_format not in {"human", "json"}:
+        typer.echo("error WYS900: --format must be 'human' or 'json'", err=True)
+        raise typer.Exit(4)
+
+    try:
+        parsed_wf = load_workflow(workflow)
+    except (WorkflowLoadError, WorkflowParseError) as err:
+        if github_annotations:
+            typer.echo(f"::error title=WYS900::{escape_github_data(str(err))}", err=True)
+        if output_format == "json":
+            typer.echo(
+                json.dumps(
+                    {
+                        "status": "INVALID_WORKFLOW",
+                        "passed": False,
+                        "blocked": False,
+                        "error": str(err),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            typer.echo(f"error WYS900: {err}", err=True)
+        raise typer.Exit(2) from err
+    except Exception as err:
+        typer.echo(f"error: {err}", err=True)
+        raise typer.Exit(4) from err
+
+    val_res = validate_workflow(parsed_wf, policy=CapabilityPolicy(allowed=frozenset(Capability)))
+    if not val_res.valid or val_res.workflow is None:
+        if github_annotations:
+            for diag in val_res.diagnostics:
+                typer.echo(format_diagnostic_annotation(diag), err=True)
+        if output_format == "json":
+            typer.echo(
+                json.dumps(
+                    {
+                        "status": "INVALID_WORKFLOW",
+                        "passed": False,
+                        "blocked": False,
+                        "diagnostics": [d.model_dump(mode="json") for d in val_res.diagnostics],
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            for diag in val_res.diagnostics:
+                typer.echo(f"error {diag.code}: {diag.message}", err=True)
+        raise typer.Exit(2)
+
+    actual_wf = val_res.workflow
+
+    try:
+        loaded_policy = load_policy(policy)
+    except (PolicyLoadError, PolicyParseError) as err:
+        code = getattr(err, "code", "WYS450")
+        if github_annotations:
+            typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
+        if output_format == "json":
+            typer.echo(
+                json.dumps(
+                    {
+                        "status": "INVALID_POLICY",
+                        "passed": False,
+                        "blocked": False,
+                        "error": str(err),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            typer.echo(f"error {code}: {err}", err=True)
+        raise typer.Exit(3) from err
+    except Exception as err:
+        typer.echo(f"error: {err}", err=True)
+        raise typer.Exit(4) from err
+
+    result = evaluate_policy(actual_wf, loaded_policy)
+
+    if report_file is not None:
+        report_file.parent.mkdir(parents=True, exist_ok=True)
+        report_file.write_text(result.to_json() + "\n", encoding="utf-8")
+
+    if github_annotations:
+        for v in result.violations:
+            typer.echo(f"::error title={v.code}::{escape_github_data(v.message)}", err=True)
+
+    if output_format == "json":
+        typer.echo(result.to_json())
+    else:
+        typer.echo(
+            format_policy_report(result, workflow_display=str(workflow), policy_display=str(policy))
+        )
+
+    if result.passed:
         raise typer.Exit(0)
     raise typer.Exit(1)
 

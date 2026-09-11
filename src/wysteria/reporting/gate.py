@@ -2,18 +2,35 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from wysteria.diff.models import DiffSeverity, WorkflowDiff
 from wysteria.reporting.models import GateDecision, GateSummary, ReportStatus
 
+if TYPE_CHECKING:
+    from wysteria.policy.models import PolicyResult
 
-def evaluate_gate(status: ReportStatus, workflow_diff: WorkflowDiff | None) -> GateSummary:
+
+def evaluate_gate(
+    status: ReportStatus,
+    workflow_diff: WorkflowDiff | None = None,
+    policy_result: PolicyResult | None = None,
+) -> GateSummary:
     """
-    Evaluate whether a changed workflow is safe to accept based on its verification report.
-    Returns a deterministic PASS/FAIL decision with sorted reasons.
+    Evaluate whether a changed workflow is safe to accept based on its verification report,
+    semantic diff, and policy evaluation.
+    Returns a deterministic PASS/FAIL/BLOCK decision with sorted reasons.
     """
     reasons: list[str] = []
+    has_policy_block = False
 
-    # Check verification status first
+    # Check policy result first
+    if policy_result is not None and not policy_result.passed:
+        has_policy_block = True
+        for v in policy_result.violations:
+            reasons.append(f"policy violation ({v.policy}): {v.message}")
+
+    # Check verification status
     if status == ReportStatus.INVALID_WORKFLOW:
         reasons.append("invalid workflow")
     elif status == ReportStatus.INVALID_FIXTURE:
@@ -42,6 +59,9 @@ def evaluate_gate(status: ReportStatus, workflow_diff: WorkflowDiff | None) -> G
                     break
             if has_non_info:
                 reasons.append("non-informational workflow changes")
+
+    if has_policy_block:
+        return GateSummary(decision=GateDecision.BLOCK, reasons=sorted(reasons))
 
     if reasons:
         return GateSummary(decision=GateDecision.FAIL, reasons=sorted(reasons))

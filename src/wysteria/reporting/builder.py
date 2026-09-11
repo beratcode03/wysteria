@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from wysteria.fixtures.parser import ParsedFixture
     from wysteria.ir.models import Workflow
     from wysteria.ir.parser import ParsedWorkflow
+    from wysteria.policy.models import PolicyResult
 
 
 def _format_value(val: Any) -> str:
@@ -65,8 +66,10 @@ def categorize_diagnostic_code(code: str) -> DiagnosticCategory:
                 return DiagnosticCategory.REFERENCE
             if 300 <= num < 400:
                 return DiagnosticCategory.GRAPH
-            if 400 <= num < 500:
+            if 400 <= num < 450:
                 return DiagnosticCategory.CAPABILITY
+            if 450 <= num < 500:
+                return DiagnosticCategory.POLICY
             if 500 <= num < 600:
                 return DiagnosticCategory.SEMANTIC
             if 600 <= num < 700:
@@ -289,6 +292,7 @@ def build_developer_report(
     fixture_display: str | None = None,
     baseline_comparison: BaselineComparison | None = None,
     workflow_diff: WorkflowDiff | None = None,
+    policy_result: PolicyResult | None = None,
 ) -> DeveloperReport:
     """Build a stable, presentation-independent DeveloperReport from a VerificationResult."""
     # 1. Workflow identity
@@ -536,7 +540,8 @@ def build_developer_report(
         actual_assertions=actual_assertions,
         baseline=baseline,
         workflow_diff=workflow_diff,
-        gate=evaluate_gate(status, workflow_diff),
+        policy=policy_result,
+        gate=evaluate_gate(status, workflow_diff, policy_result=policy_result),
     )
 
 
@@ -688,6 +693,24 @@ def format_developer_report(report: DeveloperReport) -> str:
     if report.workflow_diff is not None and not report.workflow_diff.identical:
         sections.append(format_workflow_diff(report.workflow_diff))
 
+    if report.policy is not None:
+        policy_lines = ["Policy Evaluation"]
+        if report.policy.passed:
+            policy_lines.append("  ✓ PASS")
+            if report.policy.policy_name:
+                policy_lines.append(f"  Policy: {report.policy.policy_name}")
+        else:
+            policy_lines.append(f"  ✗ {report.policy.status.value}")
+            if report.policy.policy_name:
+                policy_lines.append(f"  Policy: {report.policy.policy_name}")
+            for violation in report.policy.violations:
+                node_part = f" [node: {violation.node_id}]" if violation.node_id else ""
+                cap_part = f" [capability: {violation.capability}]" if violation.capability else ""
+                policy_lines.append(
+                    f"  ✗ {violation.code} ({violation.policy}){node_part}{cap_part}: {violation.message}"
+                )
+        sections.append("\n".join(policy_lines))
+
     if report.gate is not None:
         gate_lines = ["Gate Decision"]
         if report.gate.decision == GateDecision.PASS:
@@ -697,6 +720,48 @@ def format_developer_report(report: DeveloperReport) -> str:
         for reason in report.gate.reasons:
             gate_lines.append(f"    - {reason}")
         sections.append("\n".join(gate_lines))
+
+    return "\n\n".join(sections)
+
+
+def format_policy_report(
+    result: PolicyResult,
+    *,
+    workflow_display: str | None = None,
+    policy_display: str | None = None,
+) -> str:
+    """Format a standalone PolicyResult into a deterministic human-readable string."""
+    sections: list[str] = ["Wysteria Policy Check"]
+    meta_lines: list[str] = []
+    if workflow_display:
+        meta_lines.append(f"Workflow: {workflow_display}")
+    if policy_display:
+        meta_lines.append(f"Policy: {policy_display}")
+    elif result.policy_name:
+        meta_lines.append(f"Policy: {result.policy_name}")
+    if meta_lines:
+        sections.append("\n".join(meta_lines))
+
+    res_lines = ["Result"]
+    if result.passed:
+        res_lines.append("  ✓ PASS")
+        res_lines.append("  All policy checks passed.")
+    else:
+        res_lines.append(f"  ✗ {result.status.value}")
+    sections.append("\n".join(res_lines))
+
+    if result.violations:
+        viol_lines = ["Violations"]
+        for v in result.violations:
+            viol_lines.append(f"  ✗ {v.code} ({v.policy})")
+            if v.node_id:
+                viol_lines.append(f"    Node: {v.node_id}")
+            if v.capability:
+                viol_lines.append(f"    Capability: {v.capability}")
+            if v.path:
+                viol_lines.append(f"    Path: [{v.path}]")
+            viol_lines.append(f"    {v.message}")
+        sections.append("\n".join(viol_lines))
 
     return "\n\n".join(sections)
 

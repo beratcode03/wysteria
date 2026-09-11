@@ -10,6 +10,7 @@ from pydantic import Field, field_validator
 
 from wysteria.diff.models import SemanticChange, WorkflowDiff
 from wysteria.ir.models import StrictModel, _json_value
+from wysteria.policy.models import PolicyResult
 from wysteria.reporting.diagnostics import Severity, SourceLocation
 from wysteria.verification.models import NodeExecutionTrace
 
@@ -62,6 +63,7 @@ class DiagnosticCategory(StrEnum):
     LIMIT = "limit"
     SYSTEM = "system"
     GENERAL = "general"
+    POLICY = "policy"
 
 
 class NormalizedDiagnostic(StrictModel):
@@ -202,10 +204,11 @@ class BaselineSummary(StrictModel):
 
 
 class GateDecision(StrEnum):
-    """Deterministic PASS/FAIL decision for a changed workflow."""
+    """Deterministic PASS/FAIL/BLOCK decision for a changed workflow."""
 
     PASS = "PASS"
     FAIL = "FAIL"
+    BLOCK = "BLOCK"
 
 
 class GateSummary(StrictModel):
@@ -249,6 +252,9 @@ class DeveloperReport(StrictModel):
 
     # Optional semantic workflow diff
     workflow_diff: WorkflowDiff | None = None
+
+    # Optional policy evaluation result
+    policy: PolicyResult | None = None
 
     # Optional change gate decision
     gate: GateSummary | None = None

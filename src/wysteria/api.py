@@ -48,6 +48,9 @@ from wysteria.errors import (
     BaselineParseError,
     FixtureLoadError,
     FixtureParseError,
+    PolicyError,
+    PolicyLoadError,
+    PolicyParseError,
     WorkflowLoadError,
     WorkflowParseError,
 )
@@ -89,6 +92,27 @@ from wysteria.ir.normalize import normalize_workflow as _normalize_workflow
 from wysteria.ir.parser import ParsedWorkflow
 from wysteria.ir.parser import load_workflow as _load_workflow
 from wysteria.ir.parser import parse_workflow as _parse_workflow
+from wysteria.policy.evaluator import (
+    evaluate_policy as _evaluate_policy,
+)
+from wysteria.policy.evaluator import (
+    violation_sort_key,
+)
+from wysteria.policy.models import (
+    CURRENT_POLICY_VERSION,
+    SUPPORTED_POLICY_VERSIONS,
+    Policy,
+    PolicyResult,
+    PolicyRule,
+    PolicyStatus,
+    PolicyViolation,
+)
+from wysteria.policy.parser import (
+    load_policy as _load_policy,
+)
+from wysteria.policy.parser import (
+    parse_policy as _parse_policy,
+)
 from wysteria.reporting import (
     AssertionReportItem,
     BaselineDiffEntry,
@@ -97,6 +121,8 @@ from wysteria.reporting import (
     DiagnosticCategory,
     ExecutionSummary,
     FixtureIdentity,
+    GateDecision,
+    GateSummary,
     MatchState,
     NormalizedDiagnostic,
     OutputReportItem,
@@ -107,8 +133,10 @@ from wysteria.reporting import (
     WorkflowIdentity,
     build_developer_report,
     build_report,
+    evaluate_gate,
     format_developer_report,
     format_github_annotations,
+    format_policy_report,
     format_report_json,
 )
 from wysteria.reporting.diagnostics import Diagnostic, Severity, ValidationResult
@@ -225,6 +253,24 @@ def load_fixture_document(path: str | Path) -> ParsedFixture:
     """Read and safely parse a fixture file into a document with source locations."""
 
     return _load_fixture_document(path)
+
+
+def load_policy(path: str | Path) -> Policy:
+    """Read and validate a policy file from the local filesystem."""
+
+    return _load_policy(path)
+
+
+def parse_policy(text: str, filename: str = "policy.yaml") -> Policy:
+    """Safely parse a policy YAML or JSON string and structurally validate it."""
+
+    return _parse_policy(text, filename=filename)
+
+
+def evaluate_policy(workflow: Workflow, policy: Policy) -> PolicyResult:
+    """Deterministically evaluate a validated workflow against an explicit security/governance policy."""
+
+    return _evaluate_policy(workflow, policy)
 
 
 def validate_fixture_structure(parsed: ParsedFixture) -> tuple[Fixture | None, list[Diagnostic]]:
@@ -361,6 +407,8 @@ def create_server(
 __all__ = [
     "CURRENT_BASELINE_VERSION",
     "CURRENT_FIXTURE_VERSION",
+    "CURRENT_POLICY_VERSION",
+    "SUPPORTED_POLICY_VERSIONS",
     "AssertionDiff",
     "AssertionReportItem",
     "Baseline",
@@ -386,6 +434,8 @@ __all__ = [
     "FixtureLoadError",
     "FixtureParseError",
     "FixtureValidationResult",
+    "GateDecision",
+    "GateSummary",
     "GraphCycleError",
     "MatchState",
     "NodeExecutionTrace",
@@ -394,6 +444,14 @@ __all__ = [
     "OutputReportItem",
     "ParsedFixture",
     "ParsedWorkflow",
+    "Policy",
+    "PolicyError",
+    "PolicyLoadError",
+    "PolicyParseError",
+    "PolicyResult",
+    "PolicyRule",
+    "PolicyStatus",
+    "PolicyViolation",
     "ReportStatus",
     "RuntimeEvaluationError",
     "SemanticChange",
@@ -417,22 +475,27 @@ __all__ = [
     "create_baseline",
     "create_server",
     "diff_workflows",
+    "evaluate_gate",
     "evaluate_node",
+    "evaluate_policy",
     "evaluate_workflow",
     "fingerprint_workflow",
     "format_baseline_report",
     "format_developer_report",
     "format_github_annotations",
+    "format_policy_report",
     "format_report_json",
     "format_workflow_diff",
     "load_baseline",
     "load_fixture",
     "load_fixture_document",
+    "load_policy",
     "load_workflow",
     "normalize_workflow",
     "parse_baseline",
     "parse_fixture",
     "parse_fixture_document",
+    "parse_policy",
     "parse_workflow",
     "serialize_baseline",
     "strict_equals",
@@ -442,4 +505,5 @@ __all__ = [
     "validate_fixture_structure",
     "validate_workflow",
     "verify_fixture",
+    "violation_sort_key",
 ]

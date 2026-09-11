@@ -230,4 +230,4 @@ class Workflow(StrictModel):
     edges: list[Edge] = Field(default_factory=list, max_length=MAX_EDGES)
     capabilities: list[CapabilityField] = Field(default_factory=list, max_length=MAX_CAPABILITIES)
     assertions: list[Assertion] = Field(default_factory=list, max_length=MAX_ASSERTIONS)
-    outputs: dict[str, OutputSpec] = Field(min_length=1, max_length=MAX_OUTPUTS)
+    outputs: dict[str, OutputSpec] = Field(..., max_length=MAX_OUTPUTS)

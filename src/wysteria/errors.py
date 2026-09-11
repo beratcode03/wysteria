@@ -47,3 +47,19 @@ class BaselineLoadError(BaselineError):
 
 class BaselineCreationError(BaselineError):
     """Raised when a baseline cannot be created."""
+
+
+class PolicyError(WysteriaError):
+    """Base exception for policy operations."""
+
+
+class PolicyParseError(PolicyError):
+    """Raised when a policy document cannot be parsed or fails structural validation."""
+
+    def __init__(self, message: str, *, code: str = "WYS450") -> None:
+        super().__init__(message)
+        self.code = code
+
+
+class PolicyLoadError(PolicyError):
+    """Raised when a policy document cannot be read."""
