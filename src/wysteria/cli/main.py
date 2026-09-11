@@ -48,6 +48,7 @@ from wysteria.api import (
     verify_fixture,
 )
 from wysteria.errors import (
+    ArtifactLoadError,
     ArtifactParseError,
     BaselineCreationError,
     BaselineLoadError,
@@ -74,6 +75,28 @@ from wysteria.verification.models import VerificationResult, VerificationStatus
 app = typer.Typer(
     help="Deterministic verification for declarative workflow contracts.", no_args_is_help=True
 )
+
+
+def _print_error(action: str, err: Exception, filepath: str | None = None) -> None:
+    code = getattr(err, "code", "WYS999")
+    typer.echo(f"error {code}: {err}", err=True)
+
+    typer.echo(
+        "┌─ Error Details ─────────────────────────────────────────────────────────────┐", err=True
+    )
+    typer.echo(f"│ Action:  {action}", err=True)
+    if filepath:
+        typer.echo(f"│ File:    {filepath}", err=True)
+
+    hint = getattr(err, "hint", None)
+    if hint:
+        typer.echo(f"│ Inspect: {hint}", err=True)
+    else:
+        typer.echo("│ Inspect: Check file syntax or refer to Wysteria documentation.", err=True)
+
+    typer.echo(
+        "└─────────────────────────────────────────────────────────────────────────────┘", err=True
+    )
 
 
 def _print_diagnostics(result, output_format: str) -> None:
@@ -132,7 +155,7 @@ def validate(
                 )
             )
         else:
-            typer.echo(f"error WYS900: {error}", err=True)
+            _print_error("Command execution failed", error)
         raise typer.Exit(3) from error
     if github_annotations:
         for item in result.diagnostics:
@@ -219,7 +242,7 @@ def verify(
                 policy_res = evaluate_policy(val_wf.workflow, loaded_policy)
         except (PolicyLoadError, PolicyParseError) as err:
             code = getattr(err, "code", "WYS450")
-            typer.echo(f"error {code}: {err}", err=True)
+            _print_error("Command execution failed", err)
             raise typer.Exit(3) from err
 
     workflow_display = str(workflow)
@@ -342,7 +365,7 @@ def explain(
             code = getattr(err, "code", "WYS450")
             if github_annotations:
                 typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
-            typer.echo(f"error {code}: {err}", err=True)
+            _print_error("Command execution failed", err)
             raise typer.Exit(3) from err
 
     comparison = None
@@ -354,7 +377,7 @@ def explain(
             code = getattr(err, "code", "WYS600")
             if github_annotations:
                 typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
-            typer.echo(f"error {code}: {err}", err=True)
+            _print_error("Command execution failed", err)
             raise typer.Exit(4) from err
 
         curr_wf_val = validate_workflow(parsed_wf)
@@ -371,7 +394,7 @@ def explain(
                 code = getattr(err, "code", "WYS900")
                 if github_annotations:
                     typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
-                typer.echo(f"error {code}: {err}", err=True)
+                _print_error("Command execution failed", err)
                 raise typer.Exit(2) from err
 
         comparison = compare_baseline(
@@ -402,7 +425,7 @@ def explain(
             code = getattr(err, "code", "WYS900")
             if github_annotations:
                 typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
-            typer.echo(f"error {code}: {err}", err=True)
+            _print_error("Command execution failed", err)
             raise typer.Exit(2) from err
 
     workflow_display = str(workflow)
@@ -473,7 +496,7 @@ def diff_command(
         typer.echo(f"error WYS900: failed to load old workflow: {err}", err=True)
         raise typer.Exit(2) from err
     except Exception as err:
-        typer.echo(f"error: {err}", err=True)
+        _print_error("Command execution failed", err)
         raise typer.Exit(4) from err
 
     res_old = validate_workflow(parsed_old)
@@ -489,7 +512,7 @@ def diff_command(
         typer.echo(f"error WYS900: failed to load new workflow: {err}", err=True)
         raise typer.Exit(3) from err
     except Exception as err:
-        typer.echo(f"error: {err}", err=True)
+        _print_error("Command execution failed", err)
         raise typer.Exit(4) from err
 
     res_new = validate_workflow(parsed_new)
@@ -581,13 +604,13 @@ def baseline_create(
     try:
         parsed_wf = load_workflow(workflow)
     except (WorkflowLoadError, WorkflowParseError) as err:
-        typer.echo(f"error WYS900: {err}", err=True)
+        _print_error("Command execution failed", err)
         raise typer.Exit(2) from err
 
     try:
         parsed_fix = load_fixture_document(fixture)
     except (FixtureLoadError, FixtureParseError) as err:
-        typer.echo(f"error WYS700: {err}", err=True)
+        _print_error("Command execution failed", err)
         raise typer.Exit(3) from err
 
     if output.exists() and not force:
@@ -623,10 +646,10 @@ def baseline_create(
     try:
         create_baseline(result, output, force=force)
     except BaselineCreationError as err:
-        typer.echo(f"error: {err}", err=True)
+        _print_error("Command execution failed", err)
         raise typer.Exit(4) from err
     except OSError as err:
-        typer.echo(f"error: {err}", err=True)
+        _print_error("Command execution failed", err)
         raise typer.Exit(5) from err
 
     typer.echo(f"Baseline created: {output}")
@@ -678,7 +701,7 @@ def baseline_check(
                 )
             )
         else:
-            typer.echo(f"error WYS900: {err}", err=True)
+            _print_error("Command execution failed", err)
         raise typer.Exit(2) from err
 
     try:
@@ -694,7 +717,7 @@ def baseline_check(
                 )
             )
         else:
-            typer.echo(f"error WYS700: {err}", err=True)
+            _print_error("Command execution failed", err)
         raise typer.Exit(3) from err
 
     try:
@@ -710,7 +733,7 @@ def baseline_check(
                 )
             )
         else:
-            typer.echo(f"error WYS600: {err}", err=True)
+            _print_error("Command execution failed", err)
         raise typer.Exit(4) from err
 
     result = verify_fixture(parsed_wf, parsed_fix)
@@ -769,7 +792,7 @@ def baseline_check(
                     )
                 )
             else:
-                typer.echo(f"error WYS900: {err}", err=True)
+                _print_error("Command execution failed", err)
             raise typer.Exit(2) from err
 
         base_wf_val = validate_workflow(parsed_base_wf)
@@ -878,10 +901,10 @@ def policy_check(
                 )
             )
         else:
-            typer.echo(f"error WYS900: {err}", err=True)
+            _print_error("Command execution failed", err)
         raise typer.Exit(2) from err
     except Exception as err:
-        typer.echo(f"error: {err}", err=True)
+        _print_error("Command execution failed", err)
         raise typer.Exit(4) from err
 
     val_res = validate_workflow(parsed_wf, policy=CapabilityPolicy(allowed=frozenset(Capability)))
@@ -927,10 +950,10 @@ def policy_check(
                 )
             )
         else:
-            typer.echo(f"error {code}: {err}", err=True)
+            _print_error("Command execution failed", err)
         raise typer.Exit(3) from err
     except Exception as err:
-        typer.echo(f"error: {err}", err=True)
+        _print_error("Command execution failed", err)
         raise typer.Exit(4) from err
 
     result = evaluate_policy(actual_wf, loaded_policy)
@@ -968,7 +991,7 @@ def serve(
     try:
         server = create_server(host=host, port=port)
     except ValueError as err:
-        typer.echo(f"error: {err}", err=True)
+        _print_error("Command execution failed", err)
         raise typer.Exit(1) from err
 
     typer.echo(f"Wysteria verification server running at http://{host}:{port}")
@@ -1103,7 +1126,7 @@ def artifact_generate(
             code = getattr(err, "code", "WYS450")
             if github_annotations:
                 typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
-            typer.echo(f"error {code}: {err}", err=True)
+            _print_error("Command execution failed", err)
             raise typer.Exit(3) from err
 
     comparison = None
@@ -1115,7 +1138,7 @@ def artifact_generate(
             code = getattr(err, "code", "WYS600")
             if github_annotations:
                 typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
-            typer.echo(f"error {code}: {err}", err=True)
+            _print_error("Command execution failed", err)
             raise typer.Exit(4) from err
 
         curr_wf_val = validate_workflow(parsed_wf)
@@ -1132,7 +1155,7 @@ def artifact_generate(
                 code = getattr(err, "code", "WYS900")
                 if github_annotations:
                     typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
-                typer.echo(f"error {code}: {err}", err=True)
+                _print_error("Command execution failed", err)
                 raise typer.Exit(2) from err
 
         comparison = compare_baseline(
@@ -1163,7 +1186,7 @@ def artifact_generate(
             code = getattr(err, "code", "WYS900")
             if github_annotations:
                 typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
-            typer.echo(f"error {code}: {err}", err=True)
+            _print_error("Command execution failed", err)
             raise typer.Exit(2) from err
 
     try:
@@ -1251,7 +1274,7 @@ def artifact_validate(
         if output_format == "json":
             typer.echo(json.dumps({"valid": False, "code": "WYS950", "error": msg}, indent=2))
         else:
-            typer.echo(f"error WYS950: {msg}", err=True)
+            _print_error("Command execution failed", ArtifactLoadError(msg))
         raise typer.Exit(1)
 
     try:
@@ -1266,7 +1289,7 @@ def artifact_validate(
         if output_format == "json":
             typer.echo(json.dumps({"valid": False, "code": "WYS950", "error": str(err)}, indent=2))
         else:
-            typer.echo(f"error WYS950: {err}", err=True)
+            _print_error("Command execution failed", err)
         raise typer.Exit(1) from err
 
     if output_format == "json":
@@ -1286,6 +1309,82 @@ def artifact_validate(
             f"PASS {artifact} is a valid CI Artifact v{loaded.artifact_version} (decision: {loaded.gate_decision.value})"
         )
     raise typer.Exit(0)
+
+
+@app.command()
+def demo(
+    output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
+) -> None:
+    """Run the repository's deterministic quickstart example."""
+    examples_dir = Path("examples") / "quickstart"
+    workflow_path = examples_dir / "workflow.yaml"
+    fixture_path = examples_dir / "fixture.yaml"
+    policy_path = examples_dir / "policy.yaml"
+
+    if not workflow_path.exists() or not fixture_path.exists() or not policy_path.exists():
+        typer.echo(
+            "Error: Quickstart files not found. Are you running this from the repository root?",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    try:
+        parsed_workflow = load_workflow(workflow_path)
+        val_result = validate_workflow(parsed_workflow)
+        if not val_result.valid or not val_result.workflow:
+            typer.echo("Error: Invalid quickstart workflow.", err=True)
+            raise typer.Exit(1)
+
+        workflow = val_result.workflow
+        fixture = load_fixture_document(fixture_path)
+        policy = load_policy(policy_path)
+
+        verify_res = verify_fixture(workflow, fixture, policy=None)
+        policy_res = evaluate_policy(workflow, policy)
+
+        from wysteria.api import build_report, format_report_json
+
+        report = build_report(
+            verify_res,
+            workflow=workflow,
+            fixture=fixture,
+            policy_result=policy_res,
+        )
+
+        if output_format == "json":
+            typer.echo(format_report_json(report))
+            raise typer.Exit(0 if report.gate.decision == GateDecision.PASS else 1)
+
+        typer.echo("Wysteria Demo\n")
+
+        typer.echo("Workflow: quickstart")
+        typer.echo(f"Verification: {report.status.value}")
+
+        passed_assertions = sum(1 for a in report.assertions if a.match_state == "MATCH")
+        typer.echo(f"Assertions: {passed_assertions}/{len(report.assertions)}")
+
+        passed_outputs = sum(1 for o in report.outputs if o.match_state == "MATCH")
+        typer.echo(f"Outputs: {passed_outputs}/{len(report.outputs)}")
+
+        policy_status = report.policy.status.value if report.policy else "PASS"
+        typer.echo(f"Policy: {policy_status}")
+
+        gate_decision = report.gate.decision.value if report.gate else "PASS"
+        typer.echo(f"Gate: {gate_decision}\n")
+
+        typer.echo("Fingerprint:")
+        typer.echo(report.workflow.fingerprint)
+
+        is_pass = gate_decision == GateDecision.PASS.value
+        if not is_pass:
+            raise typer.Exit(1)
+        raise typer.Exit(0)
+
+    except typer.Exit:
+        raise
+    except Exception as err:
+        typer.echo(f"Demo failed: {err}", err=True)
+        raise typer.Exit(1) from err
 
 
 if __name__ == "__main__":

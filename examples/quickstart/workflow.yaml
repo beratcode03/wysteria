@@ -1,0 +1,53 @@
+ir_version: 1
+name: quickstart
+metadata:
+  description: A minimal Wysteria quickstart workflow
+inputs:
+  username:
+    type: string
+nodes:
+  - id: format_name
+    kind: transform
+    inputs:
+      value:
+        input: username
+    config:
+      operation: uppercase
+    output_type: string
+  - id: make_greeting
+    kind: construct
+    inputs:
+      name:
+        node: format_name
+    config:
+      template:
+        greeting: "Hello, {name}!"
+        valid: true
+    output_type: object
+edges:
+  - source: {input: username}
+    target_node: format_name
+    target_input: value
+  - source: {node: format_name}
+    target_node: make_greeting
+    target_input: name
+capabilities: []
+assertions:
+  - id: check_input_exists
+    source: {input: username}
+    predicate: exists
+  - id: check_greeting_type
+    source: {node: make_greeting}
+    predicate: type_is
+    expected: object
+  - id: check_name_type
+    source: {node: format_name}
+    predicate: type_is
+    expected: string
+outputs:
+  result:
+    source: {node: make_greeting}
+    type: object
+  formatted_name:
+    source: {node: format_name}
+    type: string

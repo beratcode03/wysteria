@@ -4,29 +4,74 @@
 class WysteriaError(Exception):
     """Base exception for Wysteria."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "WYS999",
+        file_path: str | None = None,
+        hint: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.file_path = file_path
+        self.hint = hint
+
 
 class WorkflowParseError(WysteriaError):
     """Raised when a workflow document cannot be parsed."""
 
-    def __init__(self, message: str, *, code: str = "WYS900") -> None:
-        super().__init__(message)
-        self.code = code
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "WYS900",
+        file_path: str | None = None,
+        hint: str | None = None,
+    ) -> None:
+        super().__init__(message, code=code, file_path=file_path, hint=hint)
 
 
 class WorkflowLoadError(WysteriaError):
     """Raised when a workflow document cannot be read."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "WYS900",
+        file_path: str | None = None,
+        hint: str | None = None,
+    ) -> None:
+        super().__init__(message, code=code, file_path=file_path, hint=hint)
+
 
 class FixtureParseError(WysteriaError):
     """Raised when a fixture document cannot be parsed or fails structural validation."""
 
-    def __init__(self, message: str, *, code: str = "WYS700") -> None:
-        super().__init__(message)
-        self.code = code
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "WYS700",
+        file_path: str | None = None,
+        hint: str | None = None,
+    ) -> None:
+        super().__init__(message, code=code, file_path=file_path, hint=hint)
 
 
 class FixtureLoadError(WysteriaError):
     """Raised when a fixture document cannot be read."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "WYS700",
+        file_path: str | None = None,
+        hint: str | None = None,
+    ) -> None:
+        super().__init__(message, code=code, file_path=file_path, hint=hint)
 
 
 class BaselineError(WysteriaError):
@@ -79,6 +124,16 @@ class ArtifactParseError(ArtifactError):
 
 class ArtifactLoadError(ArtifactError):
     """Raised when an artifact document cannot be read."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "WYS950",
+        file_path: str | None = None,
+        hint: str | None = None,
+    ) -> None:
+        super().__init__(message, code=code, file_path=file_path, hint=hint)
 
 
 class ArtifactCreationError(ArtifactError):

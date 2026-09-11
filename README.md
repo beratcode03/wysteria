@@ -1,18 +1,29 @@
 # Wysteria
 
-Wysteria is a local-first, deterministic verifier for declarative workflow contracts. It lets
-developers validate a workflow's structure, references, graph, capabilities, and deterministic
-representation before handing it to any executor.
+**Wysteria = Yapay zekânın hazırladığı iş akışlarını gerçekten çalıştırmadan önce kontrol edip test eden bir sistem.**
 
-It is not a chatbot, LLM provider, workflow scheduler, browser automation tool, general workflow
-executor, or autonomous agent. v0.1 executes no code, shell command, SQL, HTTP request, or external
-side effect.
+It is a local-first, deterministic verifier for declarative workflow contracts. It lets developers validate a workflow's structure, references, graph, capabilities, and deterministic representation before handing it to any executor.
+
+It is not a chatbot, LLM provider, workflow scheduler, browser automation tool, general workflow executor, or autonomous agent. v0.1 executes no code, shell command, SQL, HTTP request, or external side effect.
+
+## Quickstart
+
+Get up and running and verify the built-in example in 30 seconds:
+
+```bash
+uv sync --all-groups
+uv run wysteria demo
+```
+
+The output gives you a concise view of the workflow's verification state:
+
+* **PASS**: The workflow successfully parsed, matched its deterministic fixture, and met all policies.
+* **FAIL**: A syntax error, capability violation, or assertion failure was caught statically.
+* **BLOCK**: The Wysteria gating system has rejected this workflow from advancing to execution.
 
 ## Trust boundary
 
-An LLM, IDE, or person may produce a workflow document. Wysteria treats that document as untrusted
-input. Its parser, typed IR, validators, and policy checks form the trusted core and work without an
-LLM or network connection.
+An LLM, IDE, or person may produce a workflow document. Wysteria treats that document as untrusted input. Its parser, typed IR, validators, and policy checks form the trusted core and work without an LLM or network connection.
 
 ## Minimal workflow
 

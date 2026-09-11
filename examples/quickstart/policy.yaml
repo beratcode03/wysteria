@@ -1,0 +1,13 @@
+policy_version: 1
+name: quickstart-policy
+description: Basic policy for quickstart demo.
+max_nodes: 10
+max_edges: 10
+forbidden_capabilities:
+  - network.http
+  - process.execute
+  - file.read
+required_capabilities: []
+require_assertions: true
+require_outputs: true
+forbid_unreachable_nodes: true
