@@ -201,6 +201,20 @@ class BaselineSummary(StrictModel):
     reasons: list[str] = Field(default_factory=list)
 
 
+class GateDecision(StrEnum):
+    """Deterministic PASS/FAIL decision for a changed workflow."""
+
+    PASS = "PASS"
+    FAIL = "FAIL"
+
+
+class GateSummary(StrictModel):
+    """Result of evaluating a workflow change against verification rules."""
+
+    decision: GateDecision
+    reasons: list[str] = Field(default_factory=list)
+
+
 class DeveloperReport(StrictModel):
     """Stable, presentation-independent developer report contract."""
 
@@ -235,6 +249,9 @@ class DeveloperReport(StrictModel):
 
     # Optional semantic workflow diff
     workflow_diff: WorkflowDiff | None = None
+
+    # Optional change gate decision
+    gate: GateSummary | None = None
 
     @property
     def semantic_changes(self) -> list[SemanticChange] | None:

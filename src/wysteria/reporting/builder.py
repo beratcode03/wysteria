@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from wysteria.diff import WorkflowDiff, format_workflow_diff
 from wysteria.reporting.diagnostics import Diagnostic, Severity
+from wysteria.reporting.gate import evaluate_gate
 from wysteria.reporting.models import (
     AssertionReportItem,
     BaselineDiffEntry,
@@ -16,6 +17,7 @@ from wysteria.reporting.models import (
     DiagnosticCategory,
     ExecutionSummary,
     FixtureIdentity,
+    GateDecision,
     MatchState,
     NormalizedDiagnostic,
     OutputReportItem,
@@ -534,6 +536,7 @@ def build_developer_report(
         actual_assertions=actual_assertions,
         baseline=baseline,
         workflow_diff=workflow_diff,
+        gate=evaluate_gate(status, workflow_diff),
     )
 
 
@@ -684,6 +687,16 @@ def format_developer_report(report: DeveloperReport) -> str:
 
     if report.workflow_diff is not None and not report.workflow_diff.identical:
         sections.append(format_workflow_diff(report.workflow_diff))
+
+    if report.gate is not None:
+        gate_lines = ["Gate Decision"]
+        if report.gate.decision == GateDecision.PASS:
+            gate_lines.append(f"  ✓ {report.gate.decision.value}")
+        else:
+            gate_lines.append(f"  ✗ {report.gate.decision.value}")
+        for reason in report.gate.reasons:
+            gate_lines.append(f"    - {reason}")
+        sections.append("\n".join(gate_lines))
 
     return "\n\n".join(sections)
 
