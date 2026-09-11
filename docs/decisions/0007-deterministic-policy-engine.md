@@ -41,7 +41,9 @@ Policies are defined using strict versioned contracts (`policy_version: 1`) with
 - `require_assertions`: Fails when the workflow has no assertions (neither workflow-level assertions nor `assert` nodes).
 - `require_outputs`: Fails when the workflow has no outputs (neither output specs nor `output` nodes).
 - `forbid_unreachable_nodes`: Fails when nodes cannot contribute to an output or assertion via reverse DAG reachability.
-
+- `allowed_http_hosts`: If configured, fails when an HTTP node targets a host not in this list (exact match).
+- `forbidden_http_hosts`: Fails when an HTTP node targets a host explicitly listed here (exact match).
+- `allowed_http_methods`: Fails when an HTTP node specifies an HTTP method not in this list.
 ### 4. Stable WYS Diagnostic Codes
 Policy violations use dedicated, stable diagnostic codes within the `WYS450`-`WYS457` range (`DiagnosticCategory.POLICY`):
 - `WYS450`: Policy parsing or schema validation error (`PolicyParseError`).
@@ -52,7 +54,9 @@ Policy violations use dedicated, stable diagnostic codes within the `WYS450`-`WY
 - `WYS455`: Workflow lacks assertions when `require_assertions` is enabled.
 - `WYS456`: Workflow lacks outputs when `require_outputs` is enabled.
 - `WYS457`: Workflow contains nodes that cannot contribute to an output or assertion under `forbid_unreachable_nodes`.
-
+- `WYS458`: HTTP host is not in `allowed_http_hosts`.
+- `WYS459`: HTTP host is explicitly forbidden by `forbidden_http_hosts`.
+- `WYS460`: HTTP method is not in `allowed_http_methods`.
 ### 5. Deterministic Violation Ordering
 Policy violations enforce strict, deterministic sorting:
 1. Severity (`ERROR` before `WARNING`)

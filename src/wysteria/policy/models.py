@@ -36,6 +36,9 @@ class PolicyRule(StrEnum):
     REQUIRE_ASSERTIONS = "require_assertions"
     REQUIRE_OUTPUTS = "require_outputs"
     FORBID_UNREACHABLE_NODES = "forbid_unreachable_nodes"
+    ALLOWED_HTTP_HOSTS = "allowed_http_hosts"
+    FORBIDDEN_HTTP_HOSTS = "forbidden_http_hosts"
+    ALLOWED_HTTP_METHODS = "allowed_http_methods"
 
 
 class PolicyViolation(StrictModel):
@@ -64,6 +67,9 @@ class Policy(StrictModel):
     require_assertions: bool = False
     require_outputs: bool = False
     forbid_unreachable_nodes: bool = False
+    allowed_http_hosts: list[str] | None = None
+    forbidden_http_hosts: list[str] | None = None
+    allowed_http_methods: list[str] | None = None
 
     @field_validator("forbidden_capabilities", "required_capabilities", mode="before")
     @classmethod

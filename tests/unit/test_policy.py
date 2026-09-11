@@ -783,3 +783,169 @@ expected:
     assert "policy" in rep_json
     assert rep_json["policy"]["blocked"] is True
     assert rep_json["gate"]["decision"] == "BLOCK"
+
+
+# --- HTTP Policy Tests ---
+
+HTTP_WORKFLOW_TEXT = """
+ir_version: 1
+name: http_flow
+inputs: {}
+nodes:
+  - id: n1
+    kind: constant
+    config:
+      value: "dummy"
+    output_type: string
+  - id: h1
+    kind: http
+    config:
+      method: GET
+      url: https://api.example.com/data
+    output_type: string
+  - id: h2
+    kind: http
+    config:
+      method: POST
+      url: https://internal.corp.com/v1
+    output_type: string
+  - id: h3
+    kind: http
+    config:
+      method: GET
+      url: https://evil.com/exfil
+    output_type: string
+edges: []
+capabilities:
+  - network.http
+assertions: []
+outputs:
+  result:
+    source:
+      node: h1
+    type: string
+"""
+
+
+def test_http_policy_backward_compatibility():
+    wf = _get_wf(HTTP_WORKFLOW_TEXT)
+    pol = parse_policy("policy_version: 1\nname: blank")
+    res = evaluate_policy(wf, pol)
+    assert res.passed
+    assert res.status == PolicyStatus.PASS
+
+
+def test_http_policy_allowed_hosts():
+    wf = _get_wf(HTTP_WORKFLOW_TEXT)
+    pol1 = parse_policy(
+        "policy_version: 1\nallowed_http_hosts: ['api.example.com', 'internal.corp.com', 'evil.com']"
+    )
+    res1 = evaluate_policy(wf, pol1)
+    assert res1.passed
+
+    pol2 = parse_policy("policy_version: 1\nallowed_http_hosts: ['api.example.com']")
+    res2 = evaluate_policy(wf, pol2)
+    assert not res2.passed
+    assert len(res2.violations) == 2
+    assert res2.violations[0].code == "WYS458"
+    assert res2.violations[0].node_id == "h2"
+    assert res2.violations[1].code == "WYS458"
+    assert res2.violations[1].node_id == "h3"
+
+
+def test_http_policy_forbidden_hosts():
+    wf = _get_wf(HTTP_WORKFLOW_TEXT)
+
+    pol3 = parse_policy("policy_version: 1\nforbidden_http_hosts: ['evil.com']")
+    res3 = evaluate_policy(wf, pol3)
+    assert not res3.passed
+    assert len(res3.violations) == 1
+    assert res3.violations[0].code == "WYS459"
+    assert res3.violations[0].node_id == "h3"
+
+    pol4 = parse_policy("policy_version: 1\nforbidden_http_hosts: ['unknown.com']")
+    res4 = evaluate_policy(wf, pol4)
+    assert res4.passed
+
+
+def test_http_policy_methods():
+    wf = _get_wf(HTTP_WORKFLOW_TEXT)
+
+    pol5 = parse_policy("policy_version: 1\nallowed_http_methods: ['GET', 'POST']")
+    res5 = evaluate_policy(wf, pol5)
+    assert res5.passed
+
+    pol6 = parse_policy("policy_version: 1\nallowed_http_methods: ['GET']")
+    res6 = evaluate_policy(wf, pol6)
+    assert not res6.passed
+    assert len(res6.violations) == 1
+    assert res6.violations[0].code == "WYS460"
+    assert res6.violations[0].node_id == "h2"
+    assert "POST" in res6.violations[0].message
+
+
+def test_http_policy_exact_matching():
+    wf = _get_wf(HTTP_WORKFLOW_TEXT)
+    pol7 = parse_policy(
+        "policy_version: 1\nallowed_http_hosts: ['example.com', 'evil-api.example.com', 'api.example.com.evil.com']"
+    )
+    res7 = evaluate_policy(wf, pol7)
+    assert not res7.passed
+    assert len(res7.violations) == 3
+
+
+def test_http_policy_multiple_nodes_and_deterministic_order():
+    wf = _get_wf(HTTP_WORKFLOW_TEXT)
+    pol = parse_policy("policy_version: 1\nallowed_http_hosts: []")
+    res = evaluate_policy(wf, pol)
+    assert not res.passed
+    assert len(res.violations) == 3
+    assert res.violations[0].node_id == "h1"
+    assert res.violations[1].node_id == "h2"
+    assert res.violations[2].node_id == "h3"
+
+
+def test_http_policy_both_allowed_and_forbidden():
+    wf = _get_wf(HTTP_WORKFLOW_TEXT)
+    pol = parse_policy(
+        "policy_version: 1\nallowed_http_hosts: ['api.example.com']\nforbidden_http_hosts: ['api.example.com']"
+    )
+    res = evaluate_policy(wf, pol)
+    assert not res.passed
+    assert len(res.violations) == 3
+    codes = [v.code for v in res.violations]
+    assert codes == ["WYS458", "WYS458", "WYS459"]
+
+    v_458 = [v for v in res.violations if v.code == "WYS458"]
+    assert v_458[0].node_id == "h2"
+    assert v_458[1].node_id == "h3"
+    v_459 = [v for v in res.violations if v.code == "WYS459"]
+    assert v_459[0].node_id == "h1"
+
+
+def test_http_policy_non_http_nodes_unaffected():
+    wf_text = """
+ir_version: 1
+name: http_flow
+inputs: {}
+nodes:
+  - id: n1
+    kind: constant
+    config:
+      value: "dummy"
+    output_type: string
+edges: []
+capabilities: []
+assertions: []
+outputs:
+  result:
+    source:
+      node: n1
+    type: string
+"""
+    wf = _get_wf(wf_text)
+    pol = parse_policy(
+        "policy_version: 1\nallowed_http_hosts: ['api.example.com']\nforbidden_http_hosts: ['evil.com']\nallowed_http_methods: ['GET']"
+    )
+    res = evaluate_policy(wf, pol)
+    assert res.passed

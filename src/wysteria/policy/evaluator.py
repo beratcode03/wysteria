@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections import deque
+from urllib.parse import urlparse
 
-from wysteria.ir.models import AssertNode, OutputNode, Workflow
+from wysteria.ir.models import AssertNode, HttpNode, OutputNode, Workflow
 from wysteria.policy.models import Policy, PolicyResult, PolicyRule, PolicyStatus, PolicyViolation
 from wysteria.reporting.diagnostics import Severity
 
@@ -176,6 +177,53 @@ def evaluate_policy(workflow: Workflow, policy: Policy) -> PolicyResult:
                         path=f"/nodes/{index}",
                     )
                 )
+
+    # 8. HTTP-specific policy gating
+    has_allowed_hosts = policy.allowed_http_hosts is not None
+    has_forbidden_hosts = policy.forbidden_http_hosts is not None
+    has_allowed_methods = policy.allowed_http_methods is not None
+
+    if has_allowed_hosts or has_forbidden_hosts or has_allowed_methods:
+        for index, node in enumerate(workflow.nodes):
+            if isinstance(node, HttpNode):
+                parsed = urlparse(node.config.url)
+                hostname = parsed.hostname or ""
+
+                if has_allowed_hosts and hostname not in policy.allowed_http_hosts:
+                    violations.append(
+                        PolicyViolation(
+                            code="WYS458",
+                            policy=PolicyRule.ALLOWED_HTTP_HOSTS.value,
+                            severity=Severity.ERROR,
+                            message=f"HTTP host '{hostname}' is not in the allowed list",
+                            node_id=node.id,
+                            path=f"/nodes/{index}/config/url",
+                        )
+                    )
+
+                if has_forbidden_hosts and hostname in policy.forbidden_http_hosts:
+                    violations.append(
+                        PolicyViolation(
+                            code="WYS459",
+                            policy=PolicyRule.FORBIDDEN_HTTP_HOSTS.value,
+                            severity=Severity.ERROR,
+                            message=f"HTTP host '{hostname}' is explicitly forbidden",
+                            node_id=node.id,
+                            path=f"/nodes/{index}/config/url",
+                        )
+                    )
+
+                if has_allowed_methods and node.config.method not in policy.allowed_http_methods:
+                    violations.append(
+                        PolicyViolation(
+                            code="WYS460",
+                            policy=PolicyRule.ALLOWED_HTTP_METHODS.value,
+                            severity=Severity.ERROR,
+                            message=f"HTTP method '{node.config.method}' is not in the allowed list",
+                            node_id=node.id,
+                            path=f"/nodes/{index}/config/method",
+                        )
+                    )
 
     # Deterministic violation ordering
     violations.sort(key=violation_sort_key)
