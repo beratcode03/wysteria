@@ -6,14 +6,26 @@ It is not a chatbot, LLM provider, workflow scheduler, browser automation tool, 
 
 ## Quickstart
 
-Get up and running and verify the built-in scenario in 30 seconds:
+Start by scaffolding a new valid Wysteria workspace. This generates a minimal workflow, a test fixture, a security policy, and a CI configuration.
 
 ```bash
-uv sync --all-groups
-uv run wysteria demo
+pip install wysteria
+wysteria init my-pipeline
+cd my-pipeline
+wysteria verify workflow.yaml --fixture fixture.yaml --policy policy.yaml
 ```
 
-The output gives you a concise view of Wysteria's policy and verification engine in action:
+Once the verification passes, you can customize the workflow, fixture, and policy to fit your actual data pipeline. The generated `.github/workflows/wysteria.yml` will automatically verify your contracts on every pull request.
+
+### Showcase Demo
+
+You can also run the built-in showcase to see Wysteria's policy and verification engine in action:
+
+```bash
+wysteria demo
+```
+
+The output gives you a concise view of PASS and BLOCK semantics:
 
 * **Scenario 1 (Safe Proposal)**: AI proposes a valid data pipeline. Wysteria validates it against capabilities, evaluates it against the fixture, and allows it to **PASS**.
 * **Scenario 2 (Malicious Proposal)**: AI hallucinated a `process.execute` node. Wysteria catches the unauthorized capability during policy evaluation and immediately issues a **BLOCK**.

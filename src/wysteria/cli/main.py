@@ -118,6 +118,66 @@ def _print_diagnostics(result, output_format: str) -> None:
 
 
 @app.command()
+def init(
+    directory: Annotated[
+        Path, typer.Argument(help="Target directory to initialize the workspace in.")
+    ],
+    force: Annotated[
+        bool, typer.Option("--force", help="Overwrite existing generated Wysteria files.")
+    ] = False,
+) -> None:
+    """Scaffold a complete, valid Wysteria workspace with integrated CI."""
+    from wysteria.cli.templates import (
+        FIXTURE_YAML,
+        GITHUB_WORKFLOW_YAML,
+        POLICY_YAML,
+        WORKFLOW_YAML,
+    )
+
+    typer.echo(f"Initializing Wysteria workspace in {directory}...")
+
+    # Create directories
+    directory.mkdir(parents=True, exist_ok=True)
+    github_dir = directory / ".github" / "workflows"
+    github_dir.mkdir(parents=True, exist_ok=True)
+
+    workflow_file = directory / "workflow.yaml"
+    fixture_file = directory / "fixture.yaml"
+    policy_file = directory / "policy.yaml"
+    ci_file = github_dir / "wysteria.yml"
+
+    files_to_create = [
+        (workflow_file, WORKFLOW_YAML),
+        (fixture_file, FIXTURE_YAML),
+        (policy_file, POLICY_YAML),
+        (ci_file, GITHUB_WORKFLOW_YAML),
+    ]
+
+    # Safety check
+    if not force:
+        existing = [f[0] for f in files_to_create if f[0].exists()]
+        if existing:
+            typer.echo("error: Target directory already contains Wysteria files:", err=True)
+            for file_path in existing:
+                typer.echo(f"  - {file_path}", err=True)
+            typer.echo("Use --force to overwrite them.", err=True)
+            raise typer.Exit(1)
+
+    # Write files
+    for file_path, content in files_to_create:
+        file_path.write_text(content, encoding="utf-8")
+
+    typer.echo("\nCreated:")
+    typer.echo("  workflow.yaml")
+    typer.echo("  fixture.yaml")
+    typer.echo("  policy.yaml")
+    typer.echo("  .github/workflows/wysteria.yml")
+    typer.echo("\nNext steps:")
+    typer.echo(f"  cd {directory}")
+    typer.echo("  wysteria verify workflow.yaml --fixture fixture.yaml --policy policy.yaml")
+
+
+@app.command()
 def validate(
     workflow: Annotated[
         Path, typer.Argument(exists=True, readable=True, help="Workflow YAML or JSON file.")
