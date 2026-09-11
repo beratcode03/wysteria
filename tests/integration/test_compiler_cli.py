@@ -150,7 +150,16 @@ id: allow_http
 forbidden_capabilities: []
 """)
     result = runner.invoke(
-        app, ["compile", str(proposal_path), "--verify", "--fixture", str(fixture_path), "--policy", str(policy_path)]
+        app,
+        [
+            "compile",
+            str(proposal_path),
+            "--verify",
+            "--fixture",
+            str(fixture_path),
+            "--policy",
+            str(policy_path),
+        ],
     )
     print(result.output)
     assert result.exit_code == 0

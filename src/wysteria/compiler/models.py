@@ -16,7 +16,9 @@ class ProposalSource(StrEnum):
     IDE = "ide"
     UNKNOWN = "unknown"
 
+
 ProposalSourceField = Annotated[ProposalSource, BeforeValidator(_enum_value(ProposalSource))]
+
 
 class WorkflowProposal(BaseModel):
     """An untrusted workflow proposal before it becomes trusted Workflow IR."""

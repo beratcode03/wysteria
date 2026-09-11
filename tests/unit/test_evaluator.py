@@ -20,6 +20,8 @@ from wysteria.ir.models import (
     ConstantNode,
     ConstructConfig,
     ConstructNode,
+    FileReadConfig,
+    FileReadNode,
     HttpConfig,
     HttpNode,
     OutputNode,
@@ -934,8 +936,6 @@ def test_multiple_http_nodes_use_own_mocks():
 
 
 # --- 8. FileReadNode Mock Tests ---
-
-from wysteria.ir.models import FileReadConfig, FileReadNode
 
 
 def test_file_read_node_string_mock_success():

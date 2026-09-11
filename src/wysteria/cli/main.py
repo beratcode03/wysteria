@@ -277,7 +277,7 @@ def compile_command(
             )
         else:
             _print_error("Command execution failed", err)
-        raise typer.Exit(2)
+        raise typer.Exit(2) from err
 
     policy_obj = None
     if policy:
@@ -285,7 +285,7 @@ def compile_command(
             policy_obj = load_policy(policy)
         except Exception as err:
             _print_error("Command execution failed", err)
-            raise typer.Exit(3)
+            raise typer.Exit(3) from err
 
     cap_policy = None
     if policy_obj:
@@ -332,7 +332,7 @@ def compile_command(
             parsed_fix = load_fixture_document(fixture)
         except Exception as err:
             _print_error("Command execution failed", err)
-            raise typer.Exit(3)
+            raise typer.Exit(3) from err
 
         verify_result = verify_fixture(parsed_wf, parsed_fix, policy=cap_policy)
         dev_report = build_developer_report(

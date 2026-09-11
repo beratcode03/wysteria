@@ -641,9 +641,9 @@ def test_engine_passes_mocks_to_evaluator():
         "assertions": [],
         "outputs": {"res": {"source": {"node": "out1"}, "type": "string"}},
     }
-    from wysteria.api import parse_workflow
-    from wysteria.ir.models import Workflow
     from pydantic import TypeAdapter
+
+    from wysteria.ir.models import Workflow
 
     wf = TypeAdapter(Workflow).validate_python(wf_data)
 
@@ -679,8 +679,9 @@ def test_engine_missing_mock_fails_verification():
         "assertions": [],
         "outputs": {"res": {"source": {"node": "h1"}, "type": "string"}},
     }
-    from wysteria.ir.models import Workflow
     from pydantic import TypeAdapter
+
+    from wysteria.ir.models import Workflow
 
     wf = TypeAdapter(Workflow).validate_python(wf_data)
 

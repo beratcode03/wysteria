@@ -11,11 +11,13 @@ from wysteria.errors import WorkflowLoadError
 from wysteria.ir.parser import DuplicateKeyLoader, _check_size, _error
 
 
-def parse_proposal(text: str, *, filename: str = "<memory>", format: str | None = None) -> WorkflowProposal:
+def parse_proposal(
+    text: str, *, filename: str = "<memory>", format: str | None = None
+) -> WorkflowProposal:
     """Safely parse YAML or JSON text into a WorkflowProposal."""
     _check_size(text)
     selected = format or Path(filename).suffix.lstrip(".").lower()
-    
+
     if selected in {"yaml", "yml"}:
         try:
             data = yaml.load(text, Loader=DuplicateKeyLoader)
@@ -35,7 +37,7 @@ def parse_proposal(text: str, *, filename: str = "<memory>", format: str | None 
 
     if not isinstance(data, dict):
         raise _error("proposal root must be a mapping", "WYS900")
-        
+
     try:
         return WorkflowProposal.model_validate(data)
     except ValidationError as error:
