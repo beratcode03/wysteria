@@ -11,6 +11,7 @@ from wysteria.ir.models import (
     AssertPredicate,
     ConstantNode,
     ConstructNode,
+    HttpNode,
     Node,
     OutputNode,
     SelectNode,
@@ -370,6 +371,7 @@ def _eval_assert(
 def evaluate_node(
     node: Node,
     resolved_inputs: dict[str, Any],
+    mocks: dict[str, Any] | None = None,
 ) -> tuple[Any, list[Diagnostic]]:
     """Evaluate one node against resolved inputs, returning (output, diagnostics)."""
 
@@ -402,6 +404,15 @@ def evaluate_node(
             )
         output = deepcopy(val)
 
+    elif isinstance(node, HttpNode):
+        if mocks is None or node.id not in mocks:
+            raise RuntimeEvaluationError(
+                f"missing mock for HTTP node '{node.id}'",
+                code="WYS800",
+                node_id=node.id,
+            )
+        output = deepcopy(mocks[node.id])
+
     else:
         raise RuntimeEvaluationError(
             f"unsupported node kind '{type(node).__name__}' in node '{node.id}'",
@@ -428,6 +439,7 @@ def evaluate_node(
 def evaluate_workflow(
     workflow: Workflow,
     inputs: dict[str, Any],
+    mocks: dict[str, Any] | None = None,
 ) -> WorkflowExecutionResult:
     """Evaluate a workflow DAG in deterministic topological order against inputs."""
 
@@ -466,7 +478,7 @@ def evaluate_workflow(
                             path=f"/nodes/{node.id}/inputs/{input_name}",
                         )
 
-            output, node_diagnostics = evaluate_node(node, resolved_inputs)
+            output, node_diagnostics = evaluate_node(node, resolved_inputs, mocks)
             diagnostics.extend(node_diagnostics)
             node_values[node.id] = output
 

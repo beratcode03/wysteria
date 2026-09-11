@@ -20,6 +20,8 @@ from wysteria.ir.models import (
     ConstantNode,
     ConstructConfig,
     ConstructNode,
+    HttpNode,
+    HttpConfig,
     OutputNode,
     Reference,
     SelectConfig,
@@ -745,3 +747,185 @@ def test_max_value_size_limit_rejection():
         evaluate_node(node, {})
     assert exc_info.value.code == "WYS853"
     assert "exceeds size limit" in str(exc_info.value)
+
+
+# --- 7. HttpNode Mock Tests ---
+
+
+def test_http_node_object_mock_success():
+    node = HttpNode(
+        id="h1",
+        kind="http",
+        inputs={},
+        config=HttpConfig(method="GET", url="https://api.example.com/data"),
+        output_type=ValueType.OBJECT,
+    )
+    mocks = {"h1": {"status": 200, "body": {"hello": "world"}}}
+    output, diagnostics = evaluate_node(node, {}, mocks=mocks)
+    assert diagnostics == []
+    assert output == {"status": 200, "body": {"hello": "world"}}
+
+
+def test_http_node_scalar_array_mock_success():
+    node = HttpNode(
+        id="h2",
+        kind="http",
+        inputs={},
+        config=HttpConfig(method="GET", url="https://api.example.com/arr"),
+        output_type=ValueType.ARRAY,
+    )
+    mocks = {"h2": [1, 2, 3]}
+    output, diagnostics = evaluate_node(node, {}, mocks=mocks)
+    assert diagnostics == []
+    assert output == [1, 2, 3]
+
+
+def test_http_node_missing_mock_raises_wys800():
+    node = HttpNode(
+        id="h3",
+        kind="http",
+        inputs={},
+        config=HttpConfig(method="GET", url="https://api.example.com/data"),
+        output_type=ValueType.OBJECT,
+    )
+    mocks = {"other": {}}
+    with pytest.raises(RuntimeEvaluationError) as exc_info:
+        evaluate_node(node, {}, mocks=mocks)
+    assert exc_info.value.code == "WYS800"
+    assert "missing mock for HTTP node" in str(exc_info.value)
+
+
+def test_http_node_mocks_none_raises_wys800():
+    node = HttpNode(
+        id="h4",
+        kind="http",
+        inputs={},
+        config=HttpConfig(method="GET", url="https://api.example.com/data"),
+        output_type=ValueType.OBJECT,
+    )
+    with pytest.raises(RuntimeEvaluationError) as exc_info:
+        evaluate_node(node, {}, mocks=None)
+    assert exc_info.value.code == "WYS800"
+    assert "missing mock for HTTP node" in str(exc_info.value)
+
+
+def test_http_node_incompatible_mock_type_rejected_by_existing_validation():
+    node = HttpNode(
+        id="h5",
+        kind="http",
+        inputs={},
+        config=HttpConfig(method="GET", url="https://api.example.com/data"),
+        output_type=ValueType.OBJECT,
+    )
+    mocks = {"h5": "this is a string, not an object"}
+    with pytest.raises(RuntimeEvaluationError) as exc_info:
+        evaluate_node(node, {}, mocks=mocks)
+    assert exc_info.value.code == "WYS800"
+    assert "incompatible with output_type" in str(exc_info.value)
+
+
+def test_http_node_feeds_downstream_nodes():
+    wf_data = {
+        "ir_version": 1,
+        "name": "mocked_http_wf",
+        "inputs": {},
+        "nodes": [
+            {
+                "id": "http1",
+                "kind": "http",
+                "inputs": {},
+                "config": {"method": "GET", "url": "https://api.example.com"},
+                "output_type": "object",
+            },
+            {
+                "id": "sel1",
+                "kind": "select",
+                "inputs": {"value": {"node": "http1"}},
+                "config": {"path": "/body/value"},
+                "output_type": "integer",
+            },
+            {
+                "id": "trans1",
+                "kind": "transform",
+                "inputs": {"value": {"node": "sel1"}},
+                "config": {"operation": "to_string"},
+                "output_type": "string",
+            },
+            {
+                "id": "out1",
+                "kind": "output",
+                "inputs": {"value": {"node": "trans1"}},
+                "config": {},
+                "output_type": "string",
+            },
+        ],
+        "edges": [
+            {"source": {"node": "http1"}, "target_node": "sel1", "target_input": "value"},
+            {"source": {"node": "sel1"}, "target_node": "trans1", "target_input": "value"},
+            {"source": {"node": "trans1"}, "target_node": "out1", "target_input": "value"},
+        ],
+        "capabilities": ["network.http"],
+        "assertions": [],
+        "outputs": {"res": {"source": {"node": "out1"}, "type": "string"}},
+    }
+    from pydantic import TypeAdapter
+    from wysteria.ir.models import Workflow
+
+    wf = TypeAdapter(Workflow).validate_python(wf_data)
+    mocks = {"http1": {"status": 200, "body": {"value": 42}}}
+    result = evaluate_workflow(wf, {}, mocks=mocks)
+
+    assert result.success
+    assert result.node_values["http1"] == {"status": 200, "body": {"value": 42}}
+    assert result.node_values["sel1"] == 42
+    assert result.node_values["trans1"] == "42"
+    assert result.node_values["out1"] == "42"
+
+
+def test_multiple_http_nodes_use_own_mocks():
+    wf_data = {
+        "ir_version": 1,
+        "name": "multi_mock",
+        "inputs": {},
+        "nodes": [
+            {
+                "id": "h1",
+                "kind": "http",
+                "inputs": {},
+                "config": {"method": "GET", "url": "https://api.example.com/1"},
+                "output_type": "string",
+            },
+            {
+                "id": "h2",
+                "kind": "http",
+                "inputs": {},
+                "config": {"method": "GET", "url": "https://api.example.com/2"},
+                "output_type": "string",
+            },
+            {
+                "id": "out",
+                "kind": "output",
+                "inputs": {"value": {"node": "h2"}},
+                "config": {},
+                "output_type": "string",
+            },
+        ],
+        "edges": [
+            {"source": {"node": "h2"}, "target_node": "out", "target_input": "value"},
+        ],
+        "capabilities": ["network.http"],
+        "assertions": [],
+        "outputs": {
+            "r1": {"source": {"node": "h1"}, "type": "string"},
+            "r2": {"source": {"node": "out"}, "type": "string"},
+        },
+    }
+    from pydantic import TypeAdapter
+    from wysteria.ir.models import Workflow
+
+    wf = TypeAdapter(Workflow).validate_python(wf_data)
+    mocks = {"h1": "response1", "h2": "response2"}
+    result = evaluate_workflow(wf, {}, mocks=mocks)
+    assert result.success
+    assert result.node_values["h1"] == "response1"
+    assert result.node_values["h2"] == "response2"

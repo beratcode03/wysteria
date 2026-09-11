@@ -611,3 +611,90 @@ def test_verify_diagnostic_ordering_deterministic(valid_workflow):
     assert not result.success
     paths = [d.path for d in result.diagnostics]
     assert paths == sorted(paths)
+
+
+def test_engine_passes_mocks_to_evaluator():
+    wf_data = {
+        "ir_version": 1,
+        "name": "engine_mock_test",
+        "inputs": {},
+        "nodes": [
+            {
+                "id": "h1",
+                "kind": "http",
+                "inputs": {},
+                "config": {"method": "GET", "url": "https://api.example.com"},
+                "output_type": "string",
+            },
+            {
+                "id": "out1",
+                "kind": "output",
+                "inputs": {"value": {"node": "h1"}},
+                "config": {},
+                "output_type": "string",
+            },
+        ],
+        "edges": [
+            {"source": {"node": "h1"}, "target_node": "out1", "target_input": "value"},
+        ],
+        "capabilities": ["network.http"],
+        "assertions": [],
+        "outputs": {"res": {"source": {"node": "out1"}, "type": "string"}},
+    }
+    from wysteria.api import parse_workflow
+    from wysteria.ir.models import Workflow
+    from pydantic import TypeAdapter
+
+    wf = TypeAdapter(Workflow).validate_python(wf_data)
+
+    fix = Fixture(
+        fixture_version=1,
+        id="f1",
+        inputs={},
+        mocks={"h1": "mocked string"},
+        expected={"outputs": {"res": "mocked string"}},
+    )
+
+    result = verify_fixture(wf, fix)
+    assert result.success
+    assert result.actual_outputs["res"] == "mocked string"
+
+
+def test_engine_missing_mock_fails_verification():
+    wf_data = {
+        "ir_version": 1,
+        "name": "engine_mock_test",
+        "inputs": {},
+        "nodes": [
+            {
+                "id": "h1",
+                "kind": "http",
+                "inputs": {},
+                "config": {"method": "GET", "url": "https://api.example.com"},
+                "output_type": "string",
+            }
+        ],
+        "edges": [],
+        "capabilities": ["network.http"],
+        "assertions": [],
+        "outputs": {"res": {"source": {"node": "h1"}, "type": "string"}},
+    }
+    from wysteria.ir.models import Workflow
+    from pydantic import TypeAdapter
+
+    wf = TypeAdapter(Workflow).validate_python(wf_data)
+
+    fix = Fixture(
+        fixture_version=1,
+        id="f1",
+        inputs={},
+        mocks={},  # Missing h1
+        expected={},
+    )
+
+    result = verify_fixture(wf, fix)
+    assert not result.success
+    assert result.status == VerificationStatus.RUNTIME_ERROR
+    assert len(result.diagnostics) > 0
+    assert result.diagnostics[0].code == "WYS800"
+    assert "missing mock" in result.diagnostics[0].message

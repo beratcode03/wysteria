@@ -376,16 +376,24 @@ def validate_fixture(
     return _validate_fixture(fixture, workflow, parsed=parsed)
 
 
-def evaluate_node(node, resolved_inputs: dict[str, Any]) -> tuple[Any, list[Diagnostic]]:
-    """Evaluate a single node deterministically against resolved inputs."""
+def evaluate_workflow(
+    workflow,
+    inputs: dict[str, Any],
+    mocks: dict[str, Any] | None = None,
+) -> WorkflowExecutionResult:
+    """Evaluate a complete workflow DAG deterministically against input values."""
 
-    return _evaluate_node(node, resolved_inputs)
+    return _evaluate_workflow(workflow, inputs, mocks)
 
 
-def evaluate_workflow(workflow: Workflow, inputs: dict[str, Any]) -> WorkflowExecutionResult:
-    """Evaluate a workflow DAG in deterministic topological order against inputs."""
+def evaluate_node(
+    node,
+    resolved_inputs: dict[str, Any],
+    mocks: dict[str, Any] | None = None,
+) -> tuple[Any, list[Diagnostic]]:
+    """Evaluate a single node deterministically against its resolved inputs."""
 
-    return _evaluate_workflow(workflow, inputs)
+    return _evaluate_node(node, resolved_inputs, mocks)
 
 
 def strict_equals(a: Any, b: Any) -> bool:

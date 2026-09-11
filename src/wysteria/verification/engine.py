@@ -115,7 +115,9 @@ def verify_fixture(
         )
 
     # 4. Evaluate Workflow
-    exec_result = evaluate_workflow(actual_workflow, actual_fixture.inputs)
+    exec_result = evaluate_workflow(
+        actual_workflow, actual_fixture.inputs, mocks=actual_fixture.mocks
+    )
     node_values = exec_result.node_values
     traces = exec_result.traces
 
