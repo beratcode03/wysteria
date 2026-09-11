@@ -21,26 +21,34 @@ if sys.platform == "win32":
             pass
 
 
+import typer.core
+
 from wysteria.api import (
+    CURRENT_ARTIFACT_VERSION,
     GateDecision,
+    build_ci_artifact,
     build_developer_report,
     compare_baseline,
     create_baseline,
     diff_workflows,
     evaluate_policy,
     format_baseline_report,
+    format_developer_report,
     format_explanation_human,
     format_github_annotations,
     format_policy_report,
     format_workflow_diff,
     load_baseline,
+    load_ci_artifact,
     load_fixture_document,
     load_policy,
     load_workflow,
+    save_ci_artifact,
     validate_workflow,
     verify_fixture,
 )
 from wysteria.errors import (
+    ArtifactParseError,
     BaselineCreationError,
     BaselineLoadError,
     BaselineParseError,
@@ -525,14 +533,29 @@ def schema(
 
 
 @app.command()
-def doctor() -> None:
-    """Report local installation and trusted-core status."""
+def doctor(
+    release: Annotated[
+        bool,
+        typer.Option("--release", "-r", help="Run strict release readiness checks."),
+    ] = False,
+) -> None:
+    """Report local installation, trusted-core status, and release readiness."""
 
     typer.echo(f"Wysteria {version('wysteria')}")
     typer.echo(f"Python {sys.version.split()[0]}")
     typer.echo(f"IR versions: {CURRENT_IR_VERSION}")
+    typer.echo(f"Artifact versions: {CURRENT_ARTIFACT_VERSION}")
     typer.echo("Trusted core: local parser, validator, and canonicalizer")
     typer.echo("External execution: disabled")
+
+    from wysteria.release import check_release_readiness
+
+    readiness = check_release_readiness()
+    typer.echo("")
+    typer.echo(readiness.summary())
+
+    if release and not readiness.all_passed:
+        raise typer.Exit(1)
 
 
 baseline_app = typer.Typer(
@@ -960,8 +983,309 @@ def serve(
         server.serve_forever()
     except KeyboardInterrupt:
         typer.echo("\nStopping server...")
-        server.shutdown()
-        server.server_close()
+
+
+class ArtifactGroup(typer.core.TyperGroup):
+    """Custom Typer group that defaults to 'generate' command when no subcommand is specified."""
+
+    default_cmd_name = "generate"
+
+    def parse_args(self, ctx, args):
+        if not args:
+            return super().parse_args(ctx, args)
+        cmd_name = args[0]
+        if (
+            cmd_name not in self.commands
+            and not cmd_name.startswith("-")
+            and cmd_name not in {"--help", "-h"}
+        ):
+            args = [self.default_cmd_name] + args
+        return super().parse_args(ctx, args)
+
+
+artifact_app = typer.Typer(
+    cls=ArtifactGroup,
+    help="Versioned CI artifacts representing complete verification decisions.",
+    no_args_is_help=True,
+)
+app.add_typer(artifact_app, name="artifact")
+
+
+@artifact_app.command(name="generate")
+def artifact_generate(
+    workflow: Annotated[
+        Path, typer.Argument(metavar="WORKFLOW", help="Workflow YAML or JSON file.")
+    ],
+    fixture: Annotated[Path, typer.Option("--fixture", "-f", help="Fixture YAML or JSON file.")],
+    policy: Annotated[
+        Path | None,
+        typer.Option("--policy", "-p", help="Optional policy YAML or JSON file."),
+    ] = None,
+    baseline: Annotated[
+        Path | None,
+        typer.Option("--baseline", "-b", help="Optional baseline YAML or JSON file."),
+    ] = None,
+    baseline_workflow: Annotated[
+        Path | None,
+        typer.Option(
+            "--baseline-workflow",
+            help="Old workflow YAML or JSON file for semantic diffing.",
+        ),
+    ] = None,
+    output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Write canonical CI artifact JSON to path."),
+    ] = None,
+    report_file: Annotated[
+        Path | None,
+        typer.Option("--report-file", help="Write canonical CI artifact JSON to path."),
+    ] = None,
+    github_annotations: Annotated[
+        bool,
+        typer.Option(
+            "--github-annotations",
+            help="Emit GitHub Actions workflow commands (::error, ::warning).",
+        ),
+    ] = False,
+) -> None:
+    """Generate a canonical, versioned CI artifact representing the verification decision."""
+    target_output = output or report_file
+
+    if output_format not in {"human", "json"}:
+        typer.echo("error WYS900: --format must be 'human' or 'json'", err=True)
+        raise typer.Exit(4)
+
+    parsed_wf = None
+    wf_error = None
+    try:
+        parsed_wf = load_workflow(workflow)
+    except (WorkflowLoadError, WorkflowParseError) as err:
+        wf_error = err
+
+    parsed_fix = None
+    fix_error = None
+    if wf_error is None:
+        try:
+            parsed_fix = load_fixture_document(fixture)
+        except (FixtureLoadError, FixtureParseError) as err:
+            fix_error = err
+
+    if wf_error is not None:
+        code = getattr(wf_error, "code", "WYS900")
+        result = VerificationResult(
+            status=VerificationStatus.INVALID_WORKFLOW,
+            success=False,
+            fixture_id=str(fixture.stem) if fixture else "<unknown>",
+            diagnostics=[Diagnostic(code=code, severity=Severity.ERROR, message=str(wf_error))],
+        )
+    elif fix_error is not None:
+        code = getattr(fix_error, "code", "WYS700")
+        result = VerificationResult(
+            status=VerificationStatus.INVALID_FIXTURE,
+            success=False,
+            fixture_id=str(fixture.stem) if fixture else "<unknown>",
+            diagnostics=[Diagnostic(code=code, severity=Severity.ERROR, message=str(fix_error))],
+        )
+    else:
+        assert parsed_wf is not None
+        assert parsed_fix is not None
+        result = verify_fixture(parsed_wf, parsed_fix)
+
+    policy_res = None
+    if policy is not None and parsed_wf is not None:
+        try:
+            loaded_policy = load_policy(policy)
+            val_wf = validate_workflow(parsed_wf)
+            if val_wf.valid and val_wf.workflow is not None:
+                policy_res = evaluate_policy(val_wf.workflow, loaded_policy)
+        except (PolicyLoadError, PolicyParseError) as err:
+            code = getattr(err, "code", "WYS450")
+            if github_annotations:
+                typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
+            typer.echo(f"error {code}: {err}", err=True)
+            raise typer.Exit(3) from err
+
+    comparison = None
+    diff_res = None
+    if baseline is not None and parsed_wf is not None and parsed_fix is not None:
+        try:
+            loaded_baseline = load_baseline(baseline)
+        except (BaselineLoadError, BaselineParseError) as err:
+            code = getattr(err, "code", "WYS600")
+            if github_annotations:
+                typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
+            typer.echo(f"error {code}: {err}", err=True)
+            raise typer.Exit(4) from err
+
+        curr_wf_val = validate_workflow(parsed_wf)
+        curr_wf = curr_wf_val.workflow if curr_wf_val and curr_wf_val.valid else None
+
+        parsed_base_wf = None
+        if baseline_workflow is not None:
+            try:
+                base_wf_doc = load_workflow(baseline_workflow)
+                base_wf_val = validate_workflow(base_wf_doc)
+                if base_wf_val.valid and base_wf_val.workflow:
+                    parsed_base_wf = base_wf_val.workflow
+            except (WorkflowLoadError, WorkflowParseError) as err:
+                code = getattr(err, "code", "WYS900")
+                if github_annotations:
+                    typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
+                typer.echo(f"error {code}: {err}", err=True)
+                raise typer.Exit(2) from err
+
+        comparison = compare_baseline(
+            result,
+            loaded_baseline,
+            baseline_workflow=parsed_base_wf,
+            current_workflow=curr_wf,
+        )
+        diff_res = getattr(comparison, "workflow_diff", None)
+    elif baseline_workflow is not None and parsed_wf is not None:
+        try:
+            base_wf_doc = load_workflow(baseline_workflow)
+            base_wf_val = validate_workflow(base_wf_doc)
+            curr_wf_val = validate_workflow(parsed_wf)
+            if (
+                base_wf_val.valid
+                and base_wf_val.workflow
+                and curr_wf_val.valid
+                and curr_wf_val.workflow
+            ):
+                diff_res = diff_workflows(
+                    base_wf_val.workflow,
+                    curr_wf_val.workflow,
+                    old_display=str(baseline_workflow).replace("\\", "/"),
+                    new_display=str(workflow).replace("\\", "/"),
+                )
+        except (WorkflowLoadError, WorkflowParseError) as err:
+            code = getattr(err, "code", "WYS900")
+            if github_annotations:
+                typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
+            typer.echo(f"error {code}: {err}", err=True)
+            raise typer.Exit(2) from err
+
+    try:
+        workflow_display = (
+            workflow.resolve().relative_to(Path.cwd()).as_posix()
+            if workflow.resolve().is_relative_to(Path.cwd())
+            else str(workflow).replace("\\", "/")
+        )
+    except Exception:
+        workflow_display = str(workflow).replace("\\", "/")
+
+    try:
+        fixture_display = (
+            result.fixture_id
+            if result.fixture_id and result.fixture_id != "<unknown>"
+            else (
+                fixture.resolve().relative_to(Path.cwd()).as_posix()
+                if fixture.resolve().is_relative_to(Path.cwd())
+                else str(fixture).replace("\\", "/")
+            )
+        )
+    except Exception:
+        fixture_display = (
+            result.fixture_id
+            if result.fixture_id and result.fixture_id != "<unknown>"
+            else str(fixture).replace("\\", "/")
+        )
+    dev_report = build_developer_report(
+        result,
+        workflow=parsed_wf,
+        fixture=parsed_fix,
+        workflow_display=workflow_display,
+        fixture_display=fixture_display,
+        baseline_comparison=comparison,
+        workflow_diff=diff_res,
+        policy_result=policy_res,
+    )
+
+    artifact = build_ci_artifact(dev_report)
+
+    if target_output is not None:
+        save_ci_artifact(artifact, target_output)
+
+    if github_annotations:
+        for ann in format_github_annotations(dev_report):
+            typer.echo(ann, err=True)
+
+    if output_format == "json":
+        typer.echo(artifact.to_json())
+    else:
+        if target_output is not None:
+            typer.echo(
+                f"CI Artifact created: {target_output} (decision: {artifact.gate_decision.value})"
+            )
+        else:
+            typer.echo(format_developer_report(dev_report))
+
+    gate_decision = artifact.gate_decision
+    if gate_decision == GateDecision.PASS:
+        raise typer.Exit(0)
+    elif gate_decision == GateDecision.BLOCK:
+        raise typer.Exit(1)
+    else:
+        if result.status == VerificationStatus.PASSED:
+            exit_code = 1
+        else:
+            exit_code = EXIT_CODES.get(result.status, 1)
+        raise typer.Exit(exit_code)
+
+
+@artifact_app.command(name="validate")
+def artifact_validate(
+    artifact: Annotated[
+        Path, typer.Argument(metavar="ARTIFACT", help="Path to CI artifact JSON file.")
+    ],
+    output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
+) -> None:
+    """Validate an existing CI artifact against the canonical specification."""
+    if output_format not in {"human", "json"}:
+        typer.echo("error WYS900: --format must be 'human' or 'json'", err=True)
+        raise typer.Exit(4)
+
+    if not artifact.is_file():
+        msg = f"artifact file not found: {artifact}"
+        if output_format == "json":
+            typer.echo(json.dumps({"valid": False, "code": "WYS950", "error": msg}, indent=2))
+        else:
+            typer.echo(f"error WYS950: {msg}", err=True)
+        raise typer.Exit(1)
+
+    try:
+        loaded = load_ci_artifact(artifact)
+    except ArtifactParseError as err:
+        if output_format == "json":
+            typer.echo(json.dumps({"valid": False, "code": err.code, "error": str(err)}, indent=2))
+        else:
+            typer.echo(f"error {err.code}: {err}", err=True)
+        raise typer.Exit(1) from err
+    except Exception as err:
+        if output_format == "json":
+            typer.echo(json.dumps({"valid": False, "code": "WYS950", "error": str(err)}, indent=2))
+        else:
+            typer.echo(f"error WYS950: {err}", err=True)
+        raise typer.Exit(1) from err
+
+    if output_format == "json":
+        typer.echo(
+            json.dumps(
+                {
+                    "valid": True,
+                    "artifact_version": loaded.artifact_version,
+                    "gate_decision": loaded.gate_decision.value,
+                    "workflow_fingerprint": loaded.workflow_fingerprint,
+                },
+                indent=2,
+            )
+        )
+    else:
+        typer.echo(
+            f"PASS {artifact} is a valid CI Artifact v{loaded.artifact_version} (decision: {loaded.gate_decision.value})"
+        )
+    raise typer.Exit(0)
 
 
 if __name__ == "__main__":

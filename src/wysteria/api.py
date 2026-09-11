@@ -1,4 +1,5 @@
 """Small stable public API for loading and verifying Workflow IR."""
+# ruff: noqa: I001
 
 from pathlib import Path
 from typing import Any
@@ -42,6 +43,10 @@ from wysteria.diff import (
     format_workflow_diff,
 )
 from wysteria.errors import (
+    ArtifactCreationError,
+    ArtifactError,
+    ArtifactLoadError,
+    ArtifactParseError,
     BaselineCreationError,
     BaselineError,
     BaselineLoadError,
@@ -128,6 +133,11 @@ from wysteria.provenance import (
     format_provenance_json,
     generate_explanations,
 )
+from wysteria.release import (
+    ReadinessCheck,
+    ReleaseReadinessResult,
+    check_release_readiness,
+)
 from wysteria.reporting import (
     AssertionReportItem,
     BaselineDiffEntry,
@@ -186,6 +196,18 @@ from wysteria.verification.models import (
     VerificationResult,
     VerificationStatus,
     WorkflowExecutionResult,
+)
+from wysteria.artifact import (
+    CURRENT_ARTIFACT_VERSION,
+    SUPPORTED_ARTIFACT_VERSIONS,
+    CIArtifact,
+    VerificationArtifact,
+    build_ci_artifact,
+    load_ci_artifact,
+    parse_ci_artifact,
+    save_ci_artifact,
+    serialize_ci_artifact,
+    validate_ci_artifact,
 )
 
 
@@ -420,15 +442,23 @@ def create_server(
 
 
 __all__ = [
+    "CURRENT_ARTIFACT_VERSION",
     "CURRENT_BASELINE_VERSION",
     "CURRENT_FIXTURE_VERSION",
     "CURRENT_POLICY_VERSION",
     "CURRENT_PROVENANCE_VERSION",
+    "SUPPORTED_ARTIFACT_VERSIONS",
     "SUPPORTED_POLICY_VERSIONS",
     "SUPPORTED_PROVENANCE_VERSIONS",
+    "ArtifactCreationError",
+    "ArtifactError",
+    "ArtifactLoadError",
+    "ArtifactParseError",
     "AssertionDiff",
     "AssertionReportItem",
     "Baseline",
+    "CIArtifact",
+    "VerificationArtifact",
     "BaselineComparison",
     "BaselineComparisonStatus",
     "BaselineCreationError",
@@ -478,6 +508,8 @@ __all__ = [
     "RuntimeEvaluationError",
     "SemanticChange",
     "Severity",
+    "ReadinessCheck",
+    "ReleaseReadinessResult",
     "StatusBadge",
     "StatusPresentation",
     "ValidationResult",
@@ -491,10 +523,12 @@ __all__ = [
     "WorkflowLoadError",
     "WorkflowParseError",
     "WorkflowProvenance",
+    "build_ci_artifact",
     "build_developer_report",
     "build_provenance",
     "build_report",
     "change_sort_key",
+    "check_release_readiness",
     "compare_baseline",
     "create_baseline",
     "create_server",
@@ -515,19 +549,24 @@ __all__ = [
     "format_workflow_diff",
     "generate_explanations",
     "load_baseline",
+    "load_ci_artifact",
     "load_fixture",
     "load_fixture_document",
     "load_policy",
     "load_workflow",
     "normalize_workflow",
     "parse_baseline",
+    "parse_ci_artifact",
     "parse_fixture",
     "parse_fixture_document",
     "parse_policy",
     "parse_workflow",
+    "save_ci_artifact",
     "serialize_baseline",
+    "serialize_ci_artifact",
     "strict_equals",
     "topological_sort",
+    "validate_ci_artifact",
     "validate_fixture",
     "validate_fixture_compatibility",
     "validate_fixture_structure",

@@ -63,3 +63,23 @@ class PolicyParseError(PolicyError):
 
 class PolicyLoadError(PolicyError):
     """Raised when a policy document cannot be read."""
+
+
+class ArtifactError(WysteriaError):
+    """Base exception for CI artifact operations."""
+
+
+class ArtifactParseError(ArtifactError):
+    """Raised when an artifact document cannot be parsed or fails structural validation."""
+
+    def __init__(self, message: str, *, code: str = "WYS950") -> None:
+        super().__init__(message)
+        self.code = code
+
+
+class ArtifactLoadError(ArtifactError):
+    """Raised when an artifact document cannot be read."""
+
+
+class ArtifactCreationError(ArtifactError):
+    """Raised when a CI artifact cannot be created."""

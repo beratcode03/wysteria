@@ -382,13 +382,132 @@ jobs:
           path: artifacts/
 ```
 
+### CI Artifacts & Release Readiness
+
+Wysteria provides versioned, machine-readable CI artifacts representing the complete verification decision (`CIArtifact` v1).
+
+#### What the CI Artifact is
+
+The CI artifact consolidates all verification and governance subsystems into a single canonical record:
+- **DeveloperReport**: Complete execution summary, node traces, outputs, assertions, and normalized diagnostics.
+- **Workflow Provenance**: Full lineage including workflow identity, fixture identity, and gate outcomes.
+- **GateDecision**: Deterministic outcome (`PASS`, `FAIL`, or `BLOCK`).
+- **Structured Explanations & Reasons**: Presentation-independent explanation items answering why the workflow passed, failed, or was blocked.
+- **Workflow Fingerprint**: SHA-256 canonical hash of the normalized workflow contract.
+- **Regression Baseline Result**: Detailed diff entries and comparison results against historical baselines.
+- **Semantic Workflow Diff**: Structural, signature, edge, and contract modifications between versions.
+- **Policy Result**: Capability boundary enforcement and organizational compliance violations.
+
+#### Why it is deterministic
+
+The CI artifact guarantees byte-for-byte reproducibility across runs, platforms, and environments:
+- **No Non-Deterministic Elements**: Free of timestamps, execution durations, random UUIDs, host environments, and process IDs.
+- **Machine-Independent Paths**: File paths and display names are normalized to POSIX format (`/`) and relativized to the workspace root.
+- **Stable Key Ordering**: All dictionary keys are deterministically sorted at every nesting depth (`sort_keys=True`).
+- **Stable List Ordering**: Detail collections (outputs, assertions, diagnostics, traces, reasons, violations, diff entries) use deterministic sort keys.
+- **Canonical Serialization**: Uses strict two-space indentation with a trailing newline.
+
+#### Example Artifact Structure
+
+```json
+{
+  "artifact_version": 1,
+  "schema_version": 1,
+  "gate_decision": "PASS",
+  "workflow_fingerprint": "a431d3755e3d96632bb7a089b19f484b7a2f46cbdb053e47818b27293279793c",
+  "workflow": {
+    "display_name": "examples/workflows/user_transform_flow.yaml",
+    "fingerprint": "a431d3755e3d96632bb7a089b19f484b7a2f46cbdb053e47818b27293279793c",
+    "name": "user_transform_flow"
+  },
+  "fixture": {
+    "display_name": "fixture-trim-upper",
+    "id": "fixture-trim-upper",
+    "name": "Trim and Uppercase User Fixture"
+  },
+  "developer_report": { ... },
+  "provenance": { ... },
+  "baseline": { ... },
+  "semantic_diff": null,
+  "policy": null,
+  "explanation": {
+    "decision": "PASS",
+    "fingerprint": "a431d3755e3d96632bb7a089b19f484b7a2f46cbdb053e47818b27293279793c",
+    "reasons": [
+      {
+        "category": "gate",
+        "code": null,
+        "message": "passing verification",
+        "severity": "PASS",
+        "source": "gate"
+      }
+    ]
+  },
+  "reasons": [ ... ]
+}
+```
+
+#### CLI Usage
+
+##### Generate an artifact
+
+```text
+# Generate and display summary
+wysteria artifact workflow.yaml --fixture fixture.yaml
+
+# Generate canonical JSON output
+wysteria artifact workflow.yaml --fixture fixture.yaml --format json
+
+# Write canonical JSON artifact to file with policy and baseline
+wysteria artifact workflow.yaml \
+  --fixture fixture.yaml \
+  --policy policy.yaml \
+  --baseline baseline.json \
+  --output artifacts/ci-artifact.json
+```
+
+##### Validate an artifact
+
+Strictly validate an existing CI artifact file against schema rules, enum values, and version requirements:
+
+```text
+# Human readable validation
+wysteria artifact validate artifacts/ci-artifact.json
+
+# Machine readable JSON validation
+wysteria artifact validate artifacts/ci-artifact.json --format json
+```
+
+#### Release Readiness & Doctor Checks
+
+Wysteria includes built-in release readiness checks to ensure packages and distribution environments meet open-source release standards:
+
+```text
+# General installation diagnostic
+wysteria doctor
+
+# Strict release readiness verification
+wysteria doctor --release
+```
+
+Readiness verification includes:
+- **Package metadata**: Verifies `pyproject.toml` defines required fields (`name`, `version`, `description`, `requires-python`, `license`).
+- **Version consistency**: Ensures package version matches `wysteria.__version__` and installed distribution metadata.
+- **Required project files**: Verifies `pyproject.toml` and non-empty `README.md` are present.
+- **Build configuration**: Validates build-system specifications (`uv_build`) and package source tree integrity.
+- **Package importability**: Tests importing core package modules without side effects or errors.
+- **CLI availability**: Confirms CLI entrypoint (`wysteria.cli.main:app`) resolves to a valid callable command.
+
 ### How it works in CI
 
 - **Deterministic Verification**: Verifies workflow contracts against fixtures without external network calls or side effects.
+- **Canonical CI Artifacts**: Produces versioned, deterministic CI artifacts (`ci-artifact-pass.json`, `ci-artifact-fail.json`) archived via GitHub Actions `upload-artifact`.
+- **Artifact Validation**: Validates artifact integrity directly within CI (`wysteria artifact validate`).
+- **Release Readiness Verification**: `wysteria doctor --release` validates packaging standards during the CI build stage.
 - **Clear PR Diagnostics**: On failure, the CI log highlights status, workflow, fixture, fingerprint, failure category, and expected vs actual values.
 - **GitHub Annotations**: `--github-annotations` emits native `::error` and `::warning` workflow commands with file/line locations for inline PR diff annotations.
-- **Machine-Readable Artifacts**: `--report-file <path>` writes the canonical `DeveloperReport` JSON artifact for post-run analysis or CI archiving.
-- **Exit Codes**: Preserves standard verification exit codes (`0` pass, `1` mismatch/assertion failure, `2` invalid workflow, `3` invalid fixture, `4` runtime error), failing the CI job when verification fails.
+- **Machine-Readable Artifacts**: `--report-file <path>` and `--output <path>` write the canonical JSON artifacts for post-run analysis or CI archiving.
+- **Exit Codes**: Preserves standard verification exit codes (`0` pass, `1` mismatch/assertion/policy/gate failure, `2` invalid workflow, `3` invalid fixture/policy, `4` invalid baseline/runtime error), failing the CI job when verification fails.
 
 ## Current limitations
 

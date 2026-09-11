@@ -487,3 +487,77 @@ def test_repository_deliberately_failing_ci_scenario(tmp_path):
     data = json.loads(report_file.read_text(encoding="utf-8"))
     assert data["status"] == "OUTPUT_MISMATCH"
     assert data["success"] is False
+
+
+def test_github_actions_workflow_configuration():
+    ci_file = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+    assert ci_file.is_file(), f"Missing CI workflow at {ci_file}"
+    content = ci_file.read_text(encoding="utf-8")
+
+    # Release readiness
+    assert "uv run wysteria doctor --release" in content
+
+    # Canonical artifact generation
+    assert "uv run wysteria artifact" in content
+    assert "artifacts/ci-artifact-pass.json" in content
+    assert "artifacts/ci-artifact-fail.json" in content
+    assert "uv run wysteria artifact validate" in content
+
+    # Existing verification, baseline, and annotations intact
+    assert "uv run wysteria verify" in content
+    assert "uv run wysteria baseline check" in content
+    assert "--github-annotations" in content
+    assert "uv run pytest" in content
+    assert "uv run ruff check ." in content
+    assert "uv run ruff format --check ." in content
+
+    # Pinned upload-artifact
+    assert "actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1" in content
+    assert "path: artifacts/" in content
+
+
+def test_ci_canonical_artifact_pass_and_fail_integration(tmp_path):
+    pass_artifact_file = tmp_path / "ci-artifact-pass.json"
+    res_pass = runner.invoke(
+        app,
+        [
+            "artifact",
+            str(EXAMPLE_WORKFLOW),
+            "--fixture",
+            str(EXAMPLE_FIXTURE),
+            "--baseline",
+            str(EXAMPLE_BASELINE),
+            "--output",
+            str(pass_artifact_file),
+            "--github-annotations",
+        ],
+    )
+    assert res_pass.exit_code == 0
+    assert pass_artifact_file.is_file()
+
+    # Validate pass artifact
+    res_val_pass = runner.invoke(app, ["artifact", "validate", str(pass_artifact_file)])
+    assert res_val_pass.exit_code == 0
+    assert "PASS" in res_val_pass.stdout
+
+    # Generate failing artifact
+    fail_artifact_file = tmp_path / "ci-artifact-fail.json"
+    res_fail = runner.invoke(
+        app,
+        [
+            "artifact",
+            str(EXAMPLE_WORKFLOW),
+            "--fixture",
+            str(EXAMPLE_CI_FAILING_FIXTURE),
+            "--output",
+            str(fail_artifact_file),
+            "--github-annotations",
+        ],
+    )
+    assert res_fail.exit_code == 1
+    assert fail_artifact_file.is_file()
+
+    # Validate failing artifact
+    res_val_fail = runner.invoke(app, ["artifact", "validate", str(fail_artifact_file)])
+    assert res_val_fail.exit_code == 0
+    assert "decision: FAIL" in res_val_fail.stdout
