@@ -209,6 +209,21 @@ from wysteria.artifact import (
     serialize_ci_artifact,
     validate_ci_artifact,
 )
+from wysteria.compiler.core import (
+    CompilationResult,
+    compile_proposal as _compile_proposal,
+)
+from wysteria.compiler.models import (
+    CURRENT_PROPOSAL_VERSION,
+    ProposalSource,
+    WorkflowProposal,
+)
+from wysteria.compiler.parser import (
+    load_proposal as _load_proposal,
+)
+from wysteria.compiler.parser import (
+    parse_proposal as _parse_proposal,
+)
 
 
 def parse_workflow(
@@ -223,6 +238,31 @@ def load_workflow(path: str | Path) -> ParsedWorkflow:
     """Read and safely parse a YAML or JSON workflow file."""
 
     return _load_workflow(path)
+
+
+def parse_proposal(
+    text: str, *, filename: str = "<memory>", format: str | None = None
+) -> WorkflowProposal:
+    """Safely parse a workflow proposal document."""
+
+    return _parse_proposal(text, filename=filename, format=format)
+
+
+def load_proposal(path: str | Path) -> WorkflowProposal:
+    """Read and safely parse a workflow proposal file."""
+
+    return _load_proposal(path)
+
+
+def compile_proposal(
+    proposal: WorkflowProposal,
+    *,
+    filename: str = "<proposal>",
+    policy: CapabilityPolicy | None = None,
+) -> CompilationResult:
+    """Deterministically compile an untrusted WorkflowProposal into Workflow IR."""
+
+    return _compile_proposal(proposal, filename=filename, policy=policy)
 
 
 def validate_workflow(
@@ -445,15 +485,20 @@ __all__ = [
     "Baseline",
     "BaselineComparison",
     "CIArtifact",
+    "CompilationResult",
+    "CURRENT_PROPOSAL_VERSION",
     "DeveloperReport",
     "Fixture",
     "Policy",
+    "ProposalSource",
     "VerificationResult",
     "VerificationStatus",
     "Workflow",
+    "WorkflowProposal",
     "build_ci_artifact",
     "build_developer_report",
     "compare_baseline",
+    "compile_proposal",
     "create_baseline",
     "diff_workflows",
     "evaluate_policy",
@@ -461,7 +506,9 @@ __all__ = [
     "load_ci_artifact",
     "load_fixture",
     "load_policy",
+    "load_proposal",
     "load_workflow",
+    "parse_proposal",
     "save_ci_artifact",
     "validate_fixture",
     "validate_workflow",

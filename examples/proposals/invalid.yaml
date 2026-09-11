@@ -1,0 +1,11 @@
+proposal_version: 1
+source: llm
+proposed_name: invalid_proposal
+intent: "Missing node kind and other fields"
+workflow:
+  inputs: {}
+  nodes:
+    - id: missing_kind
+      inputs: {}
+      # missing kind, output_type, config
+  outputs: {}

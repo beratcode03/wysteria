@@ -1,0 +1,8 @@
+fixture_version: 1
+id: fixture-greeting
+name: Greeting Fixture
+inputs:
+  who: "world"
+expected:
+  outputs:
+    message: "hello"

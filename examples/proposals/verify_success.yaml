@@ -1,0 +1,23 @@
+proposal_version: 1
+source: llm
+proposed_name: valid_proposal
+intent: "Output a greeting message"
+workflow:
+  inputs:
+    who:
+      type: string
+  nodes:
+    - id: greeting
+      kind: constant
+      inputs: {}
+      config:
+        value: hello
+      output_type: string
+  edges: []
+  capabilities: []
+  assertions: []
+  outputs:
+    message:
+      source:
+        node: greeting
+      type: string

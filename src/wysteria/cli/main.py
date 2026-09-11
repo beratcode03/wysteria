@@ -29,6 +29,7 @@ from wysteria.api import (
     build_ci_artifact,
     build_developer_report,
     compare_baseline,
+    compile_proposal,
     create_baseline,
     diff_workflows,
     evaluate_policy,
@@ -42,6 +43,7 @@ from wysteria.api import (
     load_ci_artifact,
     load_fixture_document,
     load_policy,
+    load_proposal,
     load_workflow,
     save_ci_artifact,
     validate_workflow,
@@ -61,6 +63,8 @@ from wysteria.errors import (
     WorkflowParseError,
 )
 from wysteria.ir.models import Capability, Workflow
+from wysteria.ir.normalize import normalize_workflow
+from wysteria.ir.parser import ParsedWorkflow
 from wysteria.ir.versioning import CURRENT_IR_VERSION
 from wysteria.reporting import escape_github_data, format_diagnostic_annotation
 from wysteria.reporting.diagnostics import Diagnostic, Severity
@@ -166,6 +170,125 @@ def validate(
             typer.echo(f"PASS {workflow} is a valid Workflow IR v{CURRENT_IR_VERSION}")
         raise typer.Exit(0)
     raise typer.Exit(2 if result.blocked else 1)
+
+
+
+
+
+@app.command(name="compile")
+def compile_command(
+    proposal: Annotated[
+        Path, typer.Argument(metavar="PROPOSAL", help="Proposal YAML or JSON file.")
+    ],
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Write compiled Workflow IR to path.")
+    ] = None,
+    verify: Annotated[
+        bool, typer.Option("--verify", help="Verify the compiled proposal immediately.")
+    ] = False,
+    fixture: Annotated[
+        Path | None, typer.Option("--fixture", "-f", help="Fixture for verification.")
+    ] = None,
+    policy: Annotated[
+        Path | None, typer.Option("--policy", "-p", help="Optional policy YAML or JSON file.")
+    ] = None,
+    output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
+) -> None:
+    """Deterministically compile a WorkflowProposal into a trusted typed Workflow IR."""
+    if output_format not in {"human", "json"}:
+        typer.echo("error WYS900: --format must be 'human' or 'json'", err=True)
+        raise typer.Exit(4)
+
+    if verify and fixture is None:
+        typer.echo("error WYS900: --verify requires --fixture", err=True)
+        raise typer.Exit(4)
+
+    try:
+        parsed_prop = load_proposal(proposal)
+    except (WorkflowLoadError, WorkflowParseError) as err:
+        if output_format == "json":
+            typer.echo(
+                json.dumps(
+                    {
+                        "success": False,
+                        "diagnostics": [
+                            {"code": "WYS900", "severity": "error", "message": str(err)}
+                        ],
+                    }
+                ),
+                err=True,
+            )
+        else:
+            _print_error("Command execution failed", err)
+        raise typer.Exit(2)
+
+    policy_obj = None
+    if policy:
+        try:
+            policy_obj = load_policy(policy)
+        except Exception as err:
+            _print_error("Command execution failed", err)
+            raise typer.Exit(3)
+
+    result = compile_proposal(parsed_prop, filename=str(proposal), policy=policy_obj)
+
+    if not result.success or result.workflow is None:
+        if output_format == "json":
+            typer.echo(
+                json.dumps(
+                    {
+                        "success": False,
+                        "diagnostics": [d.model_dump(mode="json") for d in result.diagnostics],
+                    }
+                )
+            )
+        else:
+            for d in result.diagnostics:
+                typer.echo(f"error {d.code}: {d.message}", err=True)
+        raise typer.Exit(1)
+
+    compiled_wf_json = normalize_workflow(result.workflow)
+
+    if output:
+        output.write_text(
+            json.dumps(compiled_wf_json, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        if output_format == "human" and not verify:
+            typer.echo(f"PASS compiled to {output}")
+
+    if output_format == "json" and not verify:
+        typer.echo(json.dumps(compiled_wf_json, indent=2, sort_keys=True))
+
+    if verify:
+        parsed_wf = ParsedWorkflow(data=compiled_wf_json, filename=str(proposal), locations={})
+        parsed_fix = None
+        try:
+            parsed_fix = load_fixture_document(fixture)
+        except Exception as err:
+            _print_error("Command execution failed", err)
+            raise typer.Exit(3)
+
+        verify_result = verify_fixture(parsed_wf, parsed_fix)
+        dev_report = build_developer_report(
+            verify_result,
+            workflow=parsed_wf,
+            fixture=parsed_fix,
+            workflow_display=str(proposal),
+            fixture_display=str(fixture),
+            policy_result=evaluate_policy(result.workflow, policy_obj) if policy_obj else None,
+        )
+
+        if output_format == "json":
+            typer.echo(format_verification_json(dev_report))
+        else:
+            typer.echo(format_verification_report(dev_report))
+
+        exit_code = EXIT_CODES.get(verify_result.status, 4)
+        if exit_code == 0 and dev_report.provenance.gate_decision != GateDecision.PASS:
+            exit_code = 1
+        raise typer.Exit(exit_code)
+
+    raise typer.Exit(0)
 
 
 @app.command()

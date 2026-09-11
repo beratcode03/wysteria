@@ -1,0 +1,19 @@
+proposal_version: 1
+source: llm
+proposed_name: blocked_proposal
+intent: "Uses network"
+workflow:
+  inputs: {}
+  capabilities:
+    - network.http
+  nodes:
+    - id: fetch
+      kind: constant
+      config:
+        value: "data"
+      output_type: string
+  outputs:
+    result:
+      source:
+        node: fetch
+      type: string

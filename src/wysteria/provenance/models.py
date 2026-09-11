@@ -95,6 +95,9 @@ class Provenance(StrictModel):
     """Strict, versioned provenance model capturing full workflow lineage and gating decision."""
 
     provenance_version: Literal[CURRENT_PROVENANCE_VERSION] = CURRENT_PROVENANCE_VERSION
+    proposal_source: str | None = None
+    proposal_fingerprint: str | None = None
+    compiler_version: str | None = None
     workflow: WorkflowIdentity
     workflow_fingerprint: str | None = None
     fixture: FixtureIdentity
