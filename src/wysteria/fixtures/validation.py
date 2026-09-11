@@ -122,6 +122,49 @@ def validate_fixture_compatibility(
                     )
                 )
 
+    # 4. Mocks validation
+    if fixture.mocks is not None:
+        node_map = {node.id: node for node in workflow.nodes}
+        for node_id in sorted(fixture.mocks):
+            mock_val = fixture.mocks[node_id]
+            if node_id not in node_map:
+                diagnostics.append(
+                    diagnostic(
+                        "WYS704",
+                        f"mock target '{node_id}' is not declared in workflow nodes",
+                        f"/mocks/{node_id}",
+                        parsed=parsed,
+                        severity=Severity.ERROR,
+                        hint="Provide a mock for an existing node.",
+                    )
+                )
+            else:
+                node = node_map[node_id]
+                if node.kind != "http":
+                    diagnostics.append(
+                        diagnostic(
+                            "WYS704",
+                            f"mock target '{node_id}' is of kind '{node.kind}', which is not mockable (only 'http' nodes can be mocked)",
+                            f"/mocks/{node_id}",
+                            parsed=parsed,
+                            severity=Severity.ERROR,
+                            hint="Only provide mocks for 'http' nodes.",
+                        )
+                    )
+                else:
+                    actual = _value_type(mock_val)
+                    if not _compatible(actual, node.output_type):
+                        diagnostics.append(
+                            diagnostic(
+                                "WYS704",
+                                f"mock value for '{node_id}' has type '{actual.value}', expected '{node.output_type.value}'",
+                                f"/mocks/{node_id}",
+                                parsed=parsed,
+                                severity=Severity.ERROR,
+                                hint=f"Provide a mock value compatible with type '{node.output_type.value}'.",
+                            )
+                        )
+
     return diagnostics
 
 

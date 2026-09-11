@@ -7,6 +7,7 @@ from pydantic import Field, field_validator
 from wysteria.ir.models import (
     MAX_ASSERTIONS,
     MAX_INPUTS,
+    MAX_NODES,
     MAX_OUTPUTS,
     StrictModel,
     _json_value,
@@ -55,6 +56,7 @@ class Fixture(StrictModel):
     description: str | None = None
     inputs: dict[str, Any] = Field(max_length=MAX_INPUTS)
     expected: FixtureExpected = Field(default_factory=FixtureExpected)
+    mocks: dict[str, Any] | None = Field(default=None, max_length=MAX_NODES)
 
     @field_validator("inputs")
     @classmethod
@@ -67,3 +69,10 @@ class Fixture(StrictModel):
         if value is None:
             return {}
         return value
+
+    @field_validator("mocks")
+    @classmethod
+    def _validate_mocks(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        if value is None:
+            return None
+        return {k: _json_value(v) for k, v in value.items()}

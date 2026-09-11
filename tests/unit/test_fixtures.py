@@ -24,6 +24,7 @@ from wysteria.fixtures.parser import (
     load_fixture_document,
     parse_fixture_document,
 )
+from wysteria.validation.capabilities import CapabilityPolicy
 
 
 @pytest.fixture
@@ -70,6 +71,45 @@ def minimal_workflow():
         },
     }
     result = validate_workflow(parse_workflow(json.dumps(wf_data), filename="wf.json"))
+    assert result.valid
+    return result.workflow
+
+
+@pytest.fixture
+def http_workflow():
+    wf_data = {
+        "ir_version": 1,
+        "name": "http_workflow",
+        "inputs": {},
+        "nodes": [
+            {
+                "id": "fetch_data",
+                "kind": "http",
+                "inputs": {},
+                "config": {"method": "GET", "url": "https://api.example.com/data"},
+                "output_type": "object",
+            },
+            {
+                "id": "const_node",
+                "kind": "constant",
+                "inputs": {},
+                "config": {"value": 123},
+                "output_type": "integer",
+            },
+        ],
+        "edges": [],
+        "capabilities": ["network.http"],
+        "assertions": [],
+        "outputs": {"result": {"source": {"node": "fetch_data"}, "type": "object"}},
+    }
+    from wysteria.ir.models import Capability
+
+    policy = CapabilityPolicy(allowed=frozenset({Capability.NETWORK_HTTP}))
+    result = validate_workflow(
+        parse_workflow(json.dumps(wf_data), filename="http_wf.json"), policy=policy
+    )
+    if not result.valid:
+        print(result.diagnostics)
     assert result.valid
     return result.workflow
 
@@ -123,6 +163,19 @@ def test_valid_json_fixture():
     assert fixture.inputs == {"name": "Bob"}
     assert fixture.expected.outputs == {"greeting": "hello"}
     assert fixture.expected.assertions == {"top_check": True}
+
+
+def test_valid_fixture_with_mocks():
+    yaml_text = """
+fixture_version: 1
+id: mock_case
+inputs: {}
+mocks:
+  fetch_data: {"status": "ok", "items": [1, 2, 3]}
+"""
+    fixture = parse_fixture(yaml_text, format="yaml")
+    assert fixture.id == "mock_case"
+    assert fixture.mocks == {"fetch_data": {"status": "ok", "items": [1, 2, 3]}}
 
 
 def test_yaml_and_json_parsing_consistency():
@@ -650,3 +703,57 @@ def test_validate_fixture_compatibility_direct_returns_diagnostics(minimal_workf
     diagnostics = validate_fixture_compatibility(fixture, minimal_workflow)
     assert len(diagnostics) == 1
     assert diagnostics[0].code == "WYS702"
+
+
+def test_fixture_compatibility_mock_valid(http_workflow):
+    fixture = Fixture(
+        fixture_version=1,
+        id="case_mock_valid",
+        inputs={},
+        mocks={"fetch_data": {"id": 1, "name": "test"}},
+    )
+    result = validate_fixture(fixture, http_workflow)
+    assert result.valid
+    assert len(result.diagnostics) == 0
+
+
+def test_fixture_compatibility_mock_undeclared_target(http_workflow):
+    fixture = Fixture(
+        fixture_version=1, id="case_mock_undeclared", inputs={}, mocks={"missing_node": {"id": 1}}
+    )
+    result = validate_fixture(fixture, http_workflow)
+    assert not result.valid
+    assert len(result.diagnostics) == 1
+    d = result.diagnostics[0]
+    assert d.code == "WYS704"
+    assert "not declared in workflow nodes" in d.message
+    assert d.path == "/mocks/missing_node"
+
+
+def test_fixture_compatibility_mock_unmockable_node(http_workflow):
+    fixture = Fixture(
+        fixture_version=1, id="case_mock_unmockable", inputs={}, mocks={"const_node": 123}
+    )
+    result = validate_fixture(fixture, http_workflow)
+    assert not result.valid
+    assert len(result.diagnostics) == 1
+    d = result.diagnostics[0]
+    assert d.code == "WYS704"
+    assert "not mockable" in d.message
+    assert d.path == "/mocks/const_node"
+
+
+def test_fixture_compatibility_mock_type_mismatch(http_workflow):
+    fixture = Fixture(
+        fixture_version=1,
+        id="case_mock_type_mismatch",
+        inputs={},
+        mocks={"fetch_data": "a string instead of object"},
+    )
+    result = validate_fixture(fixture, http_workflow)
+    assert not result.valid
+    assert len(result.diagnostics) == 1
+    d = result.diagnostics[0]
+    assert d.code == "WYS704"
+    assert "expected 'object'" in d.message
+    assert d.path == "/mocks/fetch_data"
