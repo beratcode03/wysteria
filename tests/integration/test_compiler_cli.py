@@ -127,6 +127,8 @@ workflow:
     res:
       source: {node: sel}
       type: integer
+  capabilities:
+    - network.http
 """)
 
     fixture_path = tmp_path / "fixture.yaml"
@@ -141,8 +143,14 @@ expected:
   outputs:
     res: 42
 """)
+    policy_path = tmp_path / "policy.yaml"
+    policy_path.write_text("""
+policy_version: 1
+id: allow_http
+forbidden_capabilities: []
+""")
     result = runner.invoke(
-        app, ["compile", str(proposal_path), "--verify", "--fixture", str(fixture_path)]
+        app, ["compile", str(proposal_path), "--verify", "--fixture", str(fixture_path), "--policy", str(policy_path)]
     )
     print(result.output)
     assert result.exit_code == 0

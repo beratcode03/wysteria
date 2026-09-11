@@ -230,7 +230,16 @@ def compile_command(
             _print_error("Command execution failed", err)
             raise typer.Exit(3)
 
-    result = compile_proposal(parsed_prop, filename=str(proposal), policy=policy_obj)
+    cap_policy = None
+    if policy_obj:
+        allowed = set(Capability)
+        if policy_obj.forbidden_capabilities:
+            for c in policy_obj.forbidden_capabilities:
+                if c in allowed:
+                    allowed.remove(c)
+        cap_policy = CapabilityPolicy(allowed=frozenset(allowed))
+
+    result = compile_proposal(parsed_prop, filename=str(proposal), policy=cap_policy)
 
     if not result.success or result.workflow is None:
         if output_format == "json":
@@ -268,7 +277,7 @@ def compile_command(
             _print_error("Command execution failed", err)
             raise typer.Exit(3)
 
-        verify_result = verify_fixture(parsed_wf, parsed_fix)
+        verify_result = verify_fixture(parsed_wf, parsed_fix, policy=cap_policy)
         dev_report = build_developer_report(
             verify_result,
             workflow=parsed_wf,

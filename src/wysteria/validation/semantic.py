@@ -6,8 +6,11 @@ from typing import Any
 from wysteria.ir.models import (
     AssertNode,
     AssertPredicate,
+    Capability,
     ConstantNode,
     ConstructNode,
+    FileReadNode,
+    HttpNode,
     OutputNode,
     Reference,
     SelectNode,
@@ -342,6 +345,28 @@ def validate_semantics(
                             parsed=parsed,
                         )
                     )
+
+        elif isinstance(node, HttpNode):
+            if Capability.NETWORK_HTTP not in workflow.capabilities:
+                diagnostics.append(
+                    diagnostic(
+                        "WYS514",
+                        f"node '{node.id}' requires capability '{Capability.NETWORK_HTTP.value}' but it is not declared in workflow capabilities",
+                        f"{path}",
+                        parsed=parsed,
+                    )
+                )
+
+        elif isinstance(node, FileReadNode):
+            if Capability.FILE_READ not in workflow.capabilities:
+                diagnostics.append(
+                    diagnostic(
+                        "WYS514",
+                        f"node '{node.id}' requires capability '{Capability.FILE_READ.value}' but it is not declared in workflow capabilities",
+                        f"{path}",
+                        parsed=parsed,
+                    )
+                )
 
     for name, output in workflow.outputs.items():
         source_type = get_source_type(output.source)

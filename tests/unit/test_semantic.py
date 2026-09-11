@@ -527,3 +527,52 @@ def test_top_level_assertion_predicate_mismatch(workflow_data):
     result = validate(workflow_data)
     assert not result.valid
     assert "WYS513" in codes(result)
+
+
+# --- Capability Enforcement Tests ---
+
+
+def test_http_node_requires_capability(workflow_data):
+    workflow_data["nodes"] = [
+        {
+            "id": "http_fetch",
+            "kind": "http",
+            "inputs": {},
+            "config": {"method": "GET", "url": "https://example.com"},
+            "output_type": "any",
+        }
+    ]
+    workflow_data["edges"] = []
+    workflow_data["outputs"]["result"] = {"source": {"node": "http_fetch"}, "type": "any"}
+    workflow_data["capabilities"] = []
+
+    result = validate(workflow_data)
+    assert not result.valid
+    assert "WYS514" in codes(result)
+    assert any("requires capability 'network.http'" in d.message for d in result.diagnostics)
+
+    workflow_data["capabilities"] = ["network.http"]
+    assert "WYS514" not in codes(validate(workflow_data))
+
+
+def test_file_read_node_requires_capability(workflow_data):
+    workflow_data["nodes"] = [
+        {
+            "id": "read_cfg",
+            "kind": "file_read",
+            "inputs": {},
+            "config": {"path": "/etc/config.json"},
+            "output_type": "any",
+        }
+    ]
+    workflow_data["edges"] = []
+    workflow_data["outputs"]["result"] = {"source": {"node": "read_cfg"}, "type": "any"}
+    workflow_data["capabilities"] = []
+
+    result = validate(workflow_data)
+    assert not result.valid
+    assert "WYS514" in codes(result)
+    assert any("requires capability 'file.read'" in d.message for d in result.diagnostics)
+
+    workflow_data["capabilities"] = ["file.read"]
+    assert "WYS514" not in codes(validate(workflow_data))

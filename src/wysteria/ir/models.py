@@ -197,8 +197,24 @@ class HttpNode(NodeBase):
     config: HttpConfig
 
 
+class FileReadConfig(StrictModel):
+    path: str
+
+
+class FileReadNode(NodeBase):
+    kind: Literal["file_read"]
+    config: FileReadConfig
+
+
 Node = Annotated[
-    ConstantNode | SelectNode | ConstructNode | TransformNode | AssertNode | OutputNode | HttpNode,
+    ConstantNode
+    | SelectNode
+    | ConstructNode
+    | TransformNode
+    | AssertNode
+    | OutputNode
+    | HttpNode
+    | FileReadNode,
     Field(discriminator="kind"),
 ]
 

@@ -11,6 +11,7 @@ from wysteria.ir.models import (
     AssertPredicate,
     ConstantNode,
     ConstructNode,
+    FileReadNode,
     HttpNode,
     Node,
     OutputNode,
@@ -408,6 +409,15 @@ def evaluate_node(
         if mocks is None or node.id not in mocks:
             raise RuntimeEvaluationError(
                 f"missing mock for HTTP node '{node.id}'",
+                code="WYS800",
+                node_id=node.id,
+            )
+        output = deepcopy(mocks[node.id])
+
+    elif isinstance(node, FileReadNode):
+        if mocks is None or node.id not in mocks:
+            raise RuntimeEvaluationError(
+                f"missing mock for file_read node '{node.id}'",
                 code="WYS800",
                 node_id=node.id,
             )

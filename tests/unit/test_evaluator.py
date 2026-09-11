@@ -20,8 +20,8 @@ from wysteria.ir.models import (
     ConstantNode,
     ConstructConfig,
     ConstructNode,
-    HttpNode,
     HttpConfig,
+    HttpNode,
     OutputNode,
     Reference,
     SelectConfig,
@@ -869,6 +869,7 @@ def test_http_node_feeds_downstream_nodes():
         "outputs": {"res": {"source": {"node": "out1"}, "type": "string"}},
     }
     from pydantic import TypeAdapter
+
     from wysteria.ir.models import Workflow
 
     wf = TypeAdapter(Workflow).validate_python(wf_data)
@@ -921,6 +922,7 @@ def test_multiple_http_nodes_use_own_mocks():
         },
     }
     from pydantic import TypeAdapter
+
     from wysteria.ir.models import Workflow
 
     wf = TypeAdapter(Workflow).validate_python(wf_data)
@@ -929,3 +931,51 @@ def test_multiple_http_nodes_use_own_mocks():
     assert result.success
     assert result.node_values["h1"] == "response1"
     assert result.node_values["h2"] == "response2"
+
+
+# --- 8. FileReadNode Mock Tests ---
+
+from wysteria.ir.models import FileReadConfig, FileReadNode
+
+
+def test_file_read_node_string_mock_success():
+    node = FileReadNode(
+        id="f1",
+        kind="file_read",
+        inputs={},
+        config=FileReadConfig(path="/etc/passwd"),
+        output_type=ValueType.STRING,
+    )
+    mocks = {"f1": "root:x:0:0:root:/root:/bin/bash"}
+    output, diagnostics = evaluate_node(node, {}, mocks=mocks)
+    assert diagnostics == []
+    assert output == "root:x:0:0:root:/root:/bin/bash"
+
+
+def test_file_read_node_object_mock_success():
+    node = FileReadNode(
+        id="f2",
+        kind="file_read",
+        inputs={},
+        config=FileReadConfig(path="config.json"),
+        output_type=ValueType.OBJECT,
+    )
+    mocks = {"f2": {"enabled": True}}
+    output, diagnostics = evaluate_node(node, {}, mocks=mocks)
+    assert diagnostics == []
+    assert output == {"enabled": True}
+
+
+def test_file_read_node_missing_mock_raises_wys800():
+    node = FileReadNode(
+        id="f3",
+        kind="file_read",
+        inputs={},
+        config=FileReadConfig(path="config.json"),
+        output_type=ValueType.OBJECT,
+    )
+    mocks = {"other": {}}
+    with pytest.raises(RuntimeEvaluationError) as exc_info:
+        evaluate_node(node, {}, mocks=mocks)
+    assert exc_info.value.code == "WYS800"
+    assert "missing mock for file_read node" in str(exc_info.value)
