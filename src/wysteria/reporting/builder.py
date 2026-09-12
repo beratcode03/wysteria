@@ -33,6 +33,7 @@ from wysteria.verification.models import NodeExecutionTrace, VerificationResult,
 
 if TYPE_CHECKING:
     from wysteria.baselines.models import BaselineComparison
+    from wysteria.evidence.models import EvidenceResult
     from wysteria.fixtures.models import Fixture
     from wysteria.fixtures.parser import ParsedFixture
     from wysteria.ir.models import Workflow
@@ -294,6 +295,7 @@ def build_developer_report(
     baseline_comparison: BaselineComparison | None = None,
     workflow_diff: WorkflowDiff | None = None,
     policy_result: PolicyResult | None = None,
+    evidence_results: list[EvidenceResult] | None = None,
 ) -> DeveloperReport:
     """Build a stable, presentation-independent DeveloperReport from a VerificationResult."""
     # 1. Workflow identity
@@ -552,6 +554,7 @@ def build_developer_report(
         assertions=assertions,
         diagnostics=norm_diags,
         traces=traces,
+        evidence_results=evidence_results,
         actual_outputs=actual_outputs,
         actual_assertions=actual_assertions,
         baseline=baseline,
@@ -706,6 +709,17 @@ def format_developer_report(report: DeveloperReport) -> str:
                 diag_blocks.append("\n".join(_format_diagnostic_block(diag)))
             cat_lines.append("\n\n".join(diag_blocks))
         sections.append("\n".join(cat_lines))
+
+    if report.evidence_results:
+        evidence_lines = ["Evidence"]
+        for item in report.evidence_results:
+            marker = "✓" if item.status.value == "verified" else "!"
+            evidence_lines.append(f"  {marker} {item.claim_id}: {item.status.value}")
+            if item.source:
+                evidence_lines.append(f"    source: {item.source}")
+            if item.reason:
+                evidence_lines.append(f"    reason: {item.reason}")
+        sections.append("\n".join(evidence_lines))
 
     if report.workflow_diff is not None and not report.workflow_diff.identical:
         sections.append(format_workflow_diff(report.workflow_diff))

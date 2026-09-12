@@ -63,6 +63,14 @@ It serves as the canonical source for command behaviors.
 
 **Errors/Security Considerations:** Subject to local file permissions and standard input validation. No RCE or network impact.
 
+### `wysteria check` — External Evidence
+
+When `--evidence` is supplied, claims embedded in the AI proposal are matched against Git-tracked evidence snapshots under `.wysteria/evidence/`. Snapshot mode is offline and never performs network access. Use `--update-snapshots` together with `--evidence` to refresh snapshots from an explicit `source_url` on each claim.
+
+**Options:** `--evidence`, `--update-snapshots`, `--evidence-dir PATH`
+
+**Important:** Capturing evidence does not yet prove a claim. Evidence results remain `needs_evidence` until a claim-specific evidence validator is implemented.
+
 ### `wysteria compile`
 
 **What it is:** Deterministically compile a WorkflowProposal into a trusted typed Workflow IR.

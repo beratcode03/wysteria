@@ -28,6 +28,7 @@ from wysteria.api import (
     GateDecision,
     build_ci_artifact,
     build_developer_report,
+    collect_evidence,
     compare_baseline,
     compile_proposal,
     create_baseline,
@@ -274,10 +275,29 @@ def check_command(
             help="Emit GitHub Actions workflow commands (::error, ::warning).",
         ),
     ] = False,
+    evidence: Annotated[
+        bool,
+        typer.Option("--evidence", help="Use committed evidence snapshots without network access."),
+    ] = False,
+    update_snapshots: Annotated[
+        bool,
+        typer.Option(
+            "--update-snapshots", help="Refresh evidence snapshots from explicit claim URLs."
+        ),
+    ] = False,
+    evidence_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--evidence-dir", help="Evidence snapshot directory (default: .wysteria/evidence)."
+        ),
+    ] = None,
 ) -> None:
     """Safely ingest and evaluate an untrusted AI-generated workflow proposal."""
     if output_format not in {"human", "json"}:
         typer.echo("error WYS900: --format must be 'human' or 'json'", err=True)
+        raise typer.Exit(4)
+    if update_snapshots and not evidence:
+        typer.echo("error WYS900: --update-snapshots requires --evidence", err=True)
         raise typer.Exit(4)
 
     try:
@@ -336,6 +356,19 @@ def check_command(
     compiled_wf_json = normalize_workflow(result.workflow)
     parsed_wf = ParsedWorkflow(data=compiled_wf_json, filename=str(proposal), locations={})
 
+    evidence_results = None
+    if evidence:
+        try:
+            evidence_results, _ = collect_evidence(
+                parsed_prop.claims,
+                base_dir=proposal.parent,
+                update_snapshots=update_snapshots,
+                snapshot_dir=evidence_dir,
+            )
+        except OSError as err:
+            _print_error("Managing evidence snapshots during check", err)
+            raise typer.Exit(5) from err
+
     if fixture is None:
         # Without a fixture, just policy check & validate
         policy_res = None
@@ -352,6 +385,7 @@ def check_command(
             workflow=parsed_wf,
             workflow_display=str(proposal),
             policy_result=policy_res,
+            evidence_results=evidence_results,
         )
         if output_format == "json":
             typer.echo(format_verification_json(dev_report))
@@ -359,6 +393,8 @@ def check_command(
             typer.echo(format_verification_report(dev_report))
 
         if dev_report.provenance.gate_decision != GateDecision.PASS:
+            raise typer.Exit(1)
+        if evidence_results and any(item.status.value != "verified" for item in evidence_results):
             raise typer.Exit(1)
         raise typer.Exit(0)
 
@@ -383,6 +419,7 @@ def check_command(
         workflow_display=str(proposal),
         fixture_display=str(fixture),
         policy_result=policy_res,
+        evidence_results=evidence_results,
     )
 
     if github_annotations:
@@ -396,6 +433,12 @@ def check_command(
 
     exit_code = EXIT_CODES.get(verify_result.status, 4)
     if exit_code == 0 and dev_report.provenance.gate_decision != GateDecision.PASS:
+        exit_code = 1
+    if (
+        exit_code == 0
+        and evidence_results
+        and any(item.status.value != "verified" for item in evidence_results)
+    ):
         exit_code = 1
     raise typer.Exit(exit_code)
 

@@ -84,6 +84,7 @@ class MockHandler(BaseHTTPRequestHandler):
             self.wfile.write(str(self.headers).encode())
         elif self.path == "/timeout":
             import time
+
             time.sleep(0.5)
             self.send_response(200)
             self.end_headers()
@@ -118,7 +119,7 @@ def mock_dns_and_socket(mock_server):
         elif host == "mixed.com":
             return [
                 (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.1", port)),
-                (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", port))
+                (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", port)),
             ]
         elif host == "private-only.com":
             return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.1.1", port))]
@@ -134,7 +135,9 @@ def mock_dns_and_socket(mock_server):
                 return orig_socket_connect(self, ("127.0.0.1", port))
         return orig_socket_connect(self, address)
 
-    def fake_create_connection(address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None):
+    def fake_create_connection(
+        address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None
+    ):
         if isinstance(address, tuple) and len(address) == 2:
             host, _ = address
             if host == "93.184.216.34":
@@ -142,12 +145,13 @@ def mock_dns_and_socket(mock_server):
         return orig_create_connection(address, timeout, source_address)
 
     with patch("socket.getaddrinfo", side_effect=fake_getaddrinfo):
-        with patch("socket.socket.connect", side_effect=fake_socket_connect, autospec=True):
+        with patch("socket.socket.connect", new=fake_socket_connect):
             with patch("socket.create_connection", side_effect=fake_create_connection):
                 yield port
 
 
 # --- 2. Redirect Tests ---
+
 
 def test_redirect_public_to_public(mock_dns_and_socket):
     fetcher = SafeFetcher()
@@ -193,6 +197,7 @@ def test_private_only_dns(mock_dns_and_socket):
 
 # --- 3. Proxy Bypass Tests ---
 
+
 def test_proxy_ignored(mock_dns_and_socket, monkeypatch):
     # Set proxy environments. SafeFetcher should ignore them and connect directly.
     monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:8080")
@@ -206,6 +211,7 @@ def test_proxy_ignored(mock_dns_and_socket, monkeypatch):
 
 
 # --- 4. URL Parsing Tests ---
+
 
 def test_malformed_url():
     fetcher = SafeFetcher()
@@ -226,7 +232,9 @@ def test_url_userinfo(mock_dns_and_socket):
     # Credentials in URL are strictly blocked by SafeFetcher to prevent leakage
     # or obscure SSRF bypasses.
     fetcher = SafeFetcher()
-    with pytest.raises(InvalidURLError, match="Credentials in URL are not allowed for security reasons"):
+    with pytest.raises(
+        InvalidURLError, match="Credentials in URL are not allowed for security reasons"
+    ):
         fetcher.get("http://user:pass@example.com/check-auth")
 
 
@@ -239,6 +247,7 @@ def test_unicode_punycode_hostname(mock_dns_and_socket):
 
 
 # --- 5. Resource Limits Tests ---
+
 
 def test_large_response_no_content_length(mock_dns_and_socket):
     fetcher = SafeFetcher(max_size=1000)
@@ -261,6 +270,7 @@ def test_timeout(mock_dns_and_socket):
 
 
 # --- 6. Credential / Header Leakage ---
+
 
 def test_no_credentials_sent(mock_dns_and_socket):
     fetcher = SafeFetcher()

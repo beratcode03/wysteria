@@ -37,6 +37,9 @@ class Claim(BaseModel):
     id: str = Field(..., description="Unique identifier for the claim in this proposal.")
     type: ClaimTypeField = ClaimType.UNKNOWN
     subject: str = Field(..., description="The subject or domain of the claim (e.g. 'Stripe API').")
+    source_url: str | None = Field(
+        None, description="Explicit evidence source URL; never inferred from subject."
+    )
 
     # Optional context depending on the claim type
     operation: str | None = None

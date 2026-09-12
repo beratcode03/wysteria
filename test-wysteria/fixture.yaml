@@ -1,0 +1,15 @@
+fixture_version: 1
+id: fixture-quickstart
+name: Quickstart Fixture
+inputs:
+  username: "alice"
+expected:
+  outputs:
+    result:
+      greeting: "Hello, ALICE!"
+      valid: true
+    formatted_name: "ALICE"
+  assertions:
+    check_input_exists: true
+    check_greeting_type: true
+    check_name_type: true

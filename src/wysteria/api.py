@@ -209,6 +209,17 @@ from wysteria.artifact import (
     serialize_ci_artifact,
     validate_ci_artifact,
 )
+from wysteria.evidence.fetcher import SafeFetcher
+from wysteria.evidence.models import Claim, ClaimType, EvidenceResult, EvidenceStatus
+from wysteria.evidence.service import collect_evidence
+from wysteria.evidence.snapshot import (
+    EvidenceSnapshot,
+    claim_hash,
+    content_hash,
+    default_snapshot_dir,
+    load_snapshot,
+    save_snapshot,
+)
 from wysteria.compiler.core import (
     CompilationResult,
     compile_proposal as _compile_proposal,
