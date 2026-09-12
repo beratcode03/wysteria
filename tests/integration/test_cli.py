@@ -488,3 +488,160 @@ def test_public_package_api(tmp_path):
     result = wysteria.verify_fixture(str(wf_file), str(fix_file))
     assert result.status == wysteria.VerificationStatus.PASSED
     assert result.success is True
+
+
+def test_verify_policy_behavior(tmp_path):
+    import json
+
+    wf_file = tmp_path / "workflow.yaml"
+    wf_file.write_text(
+        """ir_version: 1
+name: showcase
+inputs: {}
+nodes:
+  - id: n1
+    kind: constant
+    config: {value: "test"}
+    output_type: string
+edges: []
+capabilities: [network.http, file.read]
+assertions: []
+outputs:
+  result:
+    source: {node: n1}
+    type: string
+""",
+        encoding="utf-8",
+    )
+
+    fix_file = tmp_path / "fixture.yaml"
+    fix_file.write_text(
+        """fixture_version: 1
+id: test-fix
+inputs: {}
+expected:
+  outputs:
+    result: "test"
+""",
+        encoding="utf-8",
+    )
+
+    pol_file = tmp_path / "policy.yaml"
+    pol_file.write_text(
+        """policy_version: 1
+name: my-policy
+forbidden_capabilities: [process.execute]
+require_assertions: false
+require_outputs: false
+forbid_unreachable_nodes: false
+""",
+        encoding="utf-8",
+    )
+
+    pol_file_strict = tmp_path / "policy_strict.yaml"
+    pol_file_strict.write_text(
+        """policy_version: 1
+name: strict-policy
+forbidden_capabilities: [network.http]
+require_assertions: false
+require_outputs: false
+forbid_unreachable_nodes: false
+""",
+        encoding="utf-8",
+    )
+
+    pol_file_max_nodes = tmp_path / "policy_max_nodes.yaml"
+    pol_file_max_nodes.write_text(
+        """policy_version: 1
+name: max-nodes-policy
+max_nodes: 0
+forbidden_capabilities: []
+require_assertions: false
+require_outputs: false
+forbid_unreachable_nodes: false
+""",
+        encoding="utf-8",
+    )
+
+    # A. verify with showcase policy (forbids process.execute, allows network/file)
+    res_a = runner.invoke(
+        app,
+        [
+            "verify",
+            str(wf_file),
+            "--fixture",
+            str(fix_file),
+            "--policy",
+            str(pol_file),
+            "--format",
+            "json",
+        ],
+    )
+    assert res_a.exit_code == 0
+    data_a = json.loads(res_a.stdout)
+    assert data_a["status"] == "PASSED"
+    assert data_a["provenance"]["policy_violations"] == []
+
+    # B. verify with strict policy (forbids network.http) -> should fail structural validation (WYS400)
+    res_b = runner.invoke(
+        app,
+        [
+            "verify",
+            str(wf_file),
+            "--fixture",
+            str(fix_file),
+            "--policy",
+            str(pol_file_strict),
+            "--format",
+            "json",
+        ],
+    )
+    assert res_b.exit_code != 0
+    data_b = json.loads(res_b.stdout)
+    assert data_b["status"] == "INVALID_WORKFLOW"
+    assert any("WYS400" in d["code"] for d in data_b["diagnostics"])
+
+    # C. verify without explicit policy still uses strict default-deny (WYS400)
+    res_c = runner.invoke(
+        app, ["verify", str(wf_file), "--fixture", str(fix_file), "--format", "json"]
+    )
+    assert res_c.exit_code != 0
+    data_c = json.loads(res_c.stdout)
+    assert data_c["status"] == "INVALID_WORKFLOW"
+    assert any("WYS400" in d["code"] for d in data_c["diagnostics"])
+
+    # D. policy violations correctly propagated (e.g. from evaluate_policy)
+    res_d = runner.invoke(
+        app,
+        [
+            "verify",
+            str(wf_file),
+            "--fixture",
+            str(fix_file),
+            "--policy",
+            str(pol_file_max_nodes),
+            "--format",
+            "json",
+        ],
+    )
+    assert res_d.exit_code != 0
+    data_d = json.loads(res_d.stdout)
+    assert data_d["provenance"]["gate_decision"] == "BLOCK"
+    assert len(data_d["provenance"]["policy_violations"]) > 0
+    assert any(v["code"] == "WYS451" for v in data_d["provenance"]["policy_violations"])
+
+    # E. policy check and verify agree on capability decisions
+    res_e = runner.invoke(
+        app, ["policy", "check", str(wf_file), "--policy", str(pol_file), "--format", "json"]
+    )
+    assert res_e.exit_code == 0
+    data_e = json.loads(res_e.stdout)
+    assert data_e["passed"] is True
+
+    res_e2 = runner.invoke(
+        app, ["policy", "check", str(wf_file), "--policy", str(pol_file_strict), "--format", "json"]
+    )
+    assert res_e2.exit_code != 0
+    data_e2 = json.loads(res_e2.stdout)
+    assert data_e2["passed"] is False
+    assert any(v["code"] == "WYS453" for v in data_e2.get("violations", []))

@@ -401,6 +401,23 @@ def verify(
         except (FixtureLoadError, FixtureParseError) as err:
             fix_error = err
 
+    policy_obj = None
+    cap_policy = None
+    if policy is not None:
+        try:
+            policy_obj = load_policy(policy)
+        except (PolicyLoadError, PolicyParseError) as err:
+            code = getattr(err, "code", "WYS450")
+            _print_error("Command execution failed", err)
+            raise typer.Exit(3) from err
+
+        allowed = set(Capability)
+        if policy_obj.forbidden_capabilities:
+            for c in policy_obj.forbidden_capabilities:
+                if c in allowed:
+                    allowed.remove(c)
+        cap_policy = CapabilityPolicy(allowed=frozenset(allowed))
+
     if wf_error is not None:
         code = getattr(wf_error, "code", "WYS900")
         result = VerificationResult(
@@ -420,19 +437,17 @@ def verify(
     else:
         assert parsed_wf is not None
         assert parsed_fix is not None
-        result = verify_fixture(parsed_wf, parsed_fix)
+        result = verify_fixture(parsed_wf, parsed_fix, policy=cap_policy)
 
     policy_res = None
-    if policy is not None and result.status == VerificationStatus.PASSED and parsed_wf is not None:
-        try:
-            loaded_policy = load_policy(policy)
-            val_wf = validate_workflow(parsed_wf)
-            if val_wf.valid and val_wf.workflow is not None:
-                policy_res = evaluate_policy(val_wf.workflow, loaded_policy)
-        except (PolicyLoadError, PolicyParseError) as err:
-            code = getattr(err, "code", "WYS450")
-            _print_error("Command execution failed", err)
-            raise typer.Exit(3) from err
+    if (
+        policy_obj is not None
+        and result.status != VerificationStatus.INVALID_WORKFLOW
+        and parsed_wf is not None
+    ):
+        val_wf = validate_workflow(parsed_wf, policy=cap_policy)
+        if val_wf.valid and val_wf.workflow is not None:
+            policy_res = evaluate_policy(val_wf.workflow, policy_obj)
 
     workflow_display = str(workflow)
     fixture_display = (
@@ -1283,6 +1298,25 @@ def artifact_generate(
         except (FixtureLoadError, FixtureParseError) as err:
             fix_error = err
 
+    policy_obj = None
+    cap_policy = None
+    if policy is not None:
+        try:
+            policy_obj = load_policy(policy)
+        except (PolicyLoadError, PolicyParseError) as err:
+            code = getattr(err, "code", "WYS450")
+            if github_annotations:
+                typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
+            _print_error("Command execution failed", err)
+            raise typer.Exit(3) from err
+
+        allowed = set(Capability)
+        if policy_obj.forbidden_capabilities:
+            for c in policy_obj.forbidden_capabilities:
+                if c in allowed:
+                    allowed.remove(c)
+        cap_policy = CapabilityPolicy(allowed=frozenset(allowed))
+
     if wf_error is not None:
         code = getattr(wf_error, "code", "WYS900")
         result = VerificationResult(
@@ -1302,21 +1336,17 @@ def artifact_generate(
     else:
         assert parsed_wf is not None
         assert parsed_fix is not None
-        result = verify_fixture(parsed_wf, parsed_fix)
+        result = verify_fixture(parsed_wf, parsed_fix, policy=cap_policy)
 
     policy_res = None
-    if policy is not None and parsed_wf is not None:
-        try:
-            loaded_policy = load_policy(policy)
-            val_wf = validate_workflow(parsed_wf)
-            if val_wf.valid and val_wf.workflow is not None:
-                policy_res = evaluate_policy(val_wf.workflow, loaded_policy)
-        except (PolicyLoadError, PolicyParseError) as err:
-            code = getattr(err, "code", "WYS450")
-            if github_annotations:
-                typer.echo(f"::error title={code}::{escape_github_data(str(err))}", err=True)
-            _print_error("Command execution failed", err)
-            raise typer.Exit(3) from err
+    if (
+        policy_obj is not None
+        and result.status != VerificationStatus.INVALID_WORKFLOW
+        and parsed_wf is not None
+    ):
+        val_wf = validate_workflow(parsed_wf, policy=cap_policy)
+        if val_wf.valid and val_wf.workflow is not None:
+            policy_res = evaluate_policy(val_wf.workflow, policy_obj)
 
     comparison = None
     diff_res = None
