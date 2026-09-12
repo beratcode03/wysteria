@@ -28,7 +28,7 @@ def test_server_health(local_server):
         assert resp.status == 200
         data = json.loads(resp.read().decode())
         assert data["status"] == "ok"
-        assert data["version"] == "0.1.0"
+        assert data["version"] == "0.1.1"
 
 
 def test_server_scenarios(local_server):

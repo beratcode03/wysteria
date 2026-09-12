@@ -76,7 +76,7 @@ def test_cli_availability_missing(tmp_path):
     pyproj.write_text(
         """[project]
 name = "wysteria"
-version = "0.1.0"
+version = "0.1.1"
 description = "A verifier."
 readme = "README.md"
 requires-python = ">=3.12"

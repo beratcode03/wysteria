@@ -205,7 +205,7 @@ class WysteriaRequestHandler(BaseHTTPRequestHandler):
 
         # Health endpoint
         if path == "/api/health":
-            self._send_json({"status": "ok", "version": "0.1.0"})
+            self._send_json({"status": "ok", "version": "0.1.1"})
             return
 
         # Scenarios list endpoint
