@@ -716,14 +716,26 @@ def format_developer_report(report: DeveloperReport) -> str:
         sections.append("\n".join(cat_lines))
 
     if report.evidence_results:
-        evidence_lines = ["Evidence"]
+        evidence_lines = ["Evidence Verification"]
         for item in report.evidence_results:
             marker = "✓" if item.status.value == "verified" else "!"
-            evidence_lines.append(f"  {marker} {item.claim_id}: {item.status.value}")
+            type_str = f" [{item.claim_type.value}]" if getattr(item, "claim_type", None) else ""
+            evidence_lines.append(
+                f"  {marker} {item.claim_id}{type_str}: {item.status.value.upper()}"
+            )
             if item.source:
                 evidence_lines.append(f"    source: {item.source}")
+            if item.trust_tier is not None:
+                evidence_lines.append(f"    trust tier: {item.trust_tier}")
             if item.reason:
                 evidence_lines.append(f"    reason: {item.reason}")
+            if getattr(item, "evidence_text", None):
+                sanitized_text = re.sub(
+                    r"[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]", "", item.evidence_text
+                )
+                if len(sanitized_text) > 200:
+                    sanitized_text = sanitized_text[:197] + "..."
+                evidence_lines.append(f"    text: {sanitized_text}")
         sections.append("\n".join(evidence_lines))
 
     if report.workflow_diff is not None and not report.workflow_diff.identical:

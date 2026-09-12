@@ -90,6 +90,7 @@ def collect_evidence(
                 results.append(
                     EvidenceResult(
                         claim_id=claim.id,
+                        claim_type=claim.type,
                         status=EvidenceStatus.NEEDS_EVIDENCE,
                         reason="Claim has no explicit source_url; snapshot cannot be refreshed.",
                     )
@@ -100,6 +101,7 @@ def collect_evidence(
                 results.append(
                     EvidenceResult(
                         claim_id=claim.id,
+                        claim_type=claim.type,
                         status=EvidenceStatus.BLOCKED,
                         source=claim.source_url,
                         trust_tier=trust_tier,
@@ -117,6 +119,7 @@ def collect_evidence(
                 results.append(
                     EvidenceResult(
                         claim_id=claim.id,
+                        claim_type=claim.type,
                         status=EvidenceStatus.BLOCKED,
                         reason=str(exc),
                         source=claim.source_url,
@@ -126,6 +129,7 @@ def collect_evidence(
                 results.append(
                     EvidenceResult(
                         claim_id=claim.id,
+                        claim_type=claim.type,
                         status=EvidenceStatus.UNVERIFIABLE,
                         reason=str(exc),
                         source=claim.source_url,
@@ -139,6 +143,7 @@ def collect_evidence(
             results.append(
                 EvidenceResult(
                     claim_id=claim.id,
+                    claim_type=claim.type,
                     status=EvidenceStatus.UNVERIFIABLE,
                     source=claim.source_url,
                     reason=f"Invalid evidence snapshot: {exc}",
@@ -149,6 +154,7 @@ def collect_evidence(
             results.append(
                 EvidenceResult(
                     claim_id=claim.id,
+                    claim_type=claim.type,
                     status=EvidenceStatus.NEEDS_EVIDENCE,
                     source=claim.source_url,
                     reason="No committed evidence snapshot exists for this claim.",
@@ -160,6 +166,7 @@ def collect_evidence(
                 results.append(
                     EvidenceResult(
                         claim_id=claim.id,
+                        claim_type=claim.type,
                         status=EvidenceStatus.BLOCKED,
                         source=snapshot.source,
                         trust_tier=snapshot.trust_tier,
@@ -170,6 +177,7 @@ def collect_evidence(
                 results.append(
                     EvidenceResult(
                         claim_id=claim.id,
+                        claim_type=claim.type,
                         status=EvidenceStatus.UNVERIFIABLE,
                         source=snapshot.source,
                         trust_tier=snapshot.trust_tier,

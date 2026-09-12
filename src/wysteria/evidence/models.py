@@ -54,6 +54,7 @@ class EvidenceResult(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     claim_id: str
+    claim_type: ClaimTypeField | None = None
     status: EvidenceStatusField
     source: str | None = None
     trust_tier: int | None = None

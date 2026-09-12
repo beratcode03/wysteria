@@ -260,6 +260,7 @@ def verify_claim(claim: Claim, snapshot: EvidenceSnapshot | None) -> EvidenceRes
     if snapshot is None:
         return EvidenceResult(
             claim_id=claim.id,
+            claim_type=claim.type,
             status=EvidenceStatus.NEEDS_EVIDENCE,
             source=claim.source_url,
             reason="No snapshot available for verification.",
@@ -269,6 +270,7 @@ def verify_claim(claim: Claim, snapshot: EvidenceSnapshot | None) -> EvidenceRes
         status = _verify_api_endpoint(claim, snapshot)
         return EvidenceResult(
             claim_id=claim.id,
+            claim_type=claim.type,
             status=status,
             source=snapshot.source,
             trust_tier=snapshot.trust_tier,
@@ -280,6 +282,7 @@ def verify_claim(claim: Claim, snapshot: EvidenceSnapshot | None) -> EvidenceRes
         status = _verify_json_schema_claim(claim, snapshot)
         return EvidenceResult(
             claim_id=claim.id,
+            claim_type=claim.type,
             status=status,
             source=snapshot.source,
             trust_tier=snapshot.trust_tier,
@@ -290,6 +293,7 @@ def verify_claim(claim: Claim, snapshot: EvidenceSnapshot | None) -> EvidenceRes
     elif claim.type in (ClaimType.FACTUAL, ClaimType.UNKNOWN):
         return EvidenceResult(
             claim_id=claim.id,
+            claim_type=claim.type,
             status=EvidenceStatus.UNVERIFIABLE,
             source=snapshot.source,
             trust_tier=snapshot.trust_tier,
@@ -300,6 +304,7 @@ def verify_claim(claim: Claim, snapshot: EvidenceSnapshot | None) -> EvidenceRes
     else:
         return EvidenceResult(
             claim_id=claim.id,
+            claim_type=claim.type,
             status=EvidenceStatus.UNVERIFIABLE,
             source=snapshot.source,
             trust_tier=snapshot.trust_tier,

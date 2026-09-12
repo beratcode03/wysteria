@@ -683,3 +683,58 @@ def test_public_api_report_exports():
     json_str = format_report_json(report)
     assert isinstance(json_str, str)
     assert "PASSED" in json_str
+
+
+def test_evidence_verification_reporting():
+    from wysteria.evidence.models import ClaimType, EvidenceResult, EvidenceStatus
+
+    wf = _parse_wf(SAMPLE_WORKFLOW_TEXT)
+    fix = _parse_fix(HAPPY_FIXTURE_TEXT)
+    result = verify_fixture(wf, fix)
+
+    evidence_results = [
+        EvidenceResult(
+            claim_id="claim-1",
+            claim_type=ClaimType.API_ENDPOINT,
+            status=EvidenceStatus.VERIFIED,
+            source="https://docs.api.com",
+            trust_tier=1,
+            reason="All good.",
+            evidence_text="Endpoint GET /api exists. \x1b[31mDangerous ansi here\x1b[0m",
+        ),
+        EvidenceResult(
+            claim_id="claim-2",
+            claim_type=ClaimType.FACTUAL,
+            status=EvidenceStatus.UNVERIFIABLE,
+        ),
+    ]
+
+    report = build_developer_report(result, evidence_results=evidence_results)
+
+    # JSON output check
+    json_str = format_report_json(report)
+    data = json.loads(json_str)
+    assert "evidence_results" in data
+    assert len(data["evidence_results"]) == 2
+    assert data["evidence_results"][0]["claim_id"] == "claim-1"
+    assert data["evidence_results"][0]["claim_type"] == "api_endpoint"
+    assert data["evidence_results"][0]["status"] == "verified"
+    assert data["evidence_results"][0]["source"] == "https://docs.api.com"
+    assert data["evidence_results"][0]["trust_tier"] == 1
+    assert data["evidence_results"][0]["reason"] == "All good."
+
+    # CLI output check
+    cli_str = format_developer_report(report)
+    assert "Evidence Verification" in cli_str
+    assert "✓ claim-1 [api_endpoint]: VERIFIED" in cli_str
+    assert "source: https://docs.api.com" in cli_str
+    assert "trust tier: 1" in cli_str
+    assert "reason: All good." in cli_str
+    assert "! claim-2 [factual]: UNVERIFIABLE" in cli_str
+
+    # Safe rendering check (no ANSI escape)
+    assert "\x1b[31m" not in cli_str
+    assert (
+        "Endpoint GET /api exists. [31mDangerous ansi here[0m" in cli_str
+        or "Endpoint GET /api exists." in cli_str
+    )
