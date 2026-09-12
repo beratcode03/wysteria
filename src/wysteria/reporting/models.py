@@ -9,6 +9,7 @@ from typing import Any
 from pydantic import Field, field_validator
 
 from wysteria.diff.models import SemanticChange, WorkflowDiff
+from wysteria.evidence.models import EvidenceResult
 from wysteria.ir.models import StrictModel, _json_value
 from wysteria.policy.models import PolicyResult
 from wysteria.provenance.models import (
@@ -226,6 +227,7 @@ class DeveloperReport(StrictModel):
     assertions: list[AssertionReportItem] = Field(default_factory=list)
     diagnostics: list[NormalizedDiagnostic] = Field(default_factory=list)
     traces: list[NodeExecutionTrace] = Field(default_factory=list)
+    evidence_results: list[EvidenceResult] | None = None
 
     # Backwards compatibility collections
     actual_outputs: dict[str, Any] = Field(default_factory=dict)
