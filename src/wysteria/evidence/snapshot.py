@@ -32,6 +32,7 @@ class EvidenceSnapshot(BaseModel):
     content_hash: str
     body_base64: str
     retrieved_at: str
+    trust_tier: int | None = None
 
 
 def canonical_claim_bytes(claim: Claim) -> bytes:
@@ -49,7 +50,9 @@ def content_hash(body: bytes) -> str:
     return hashlib.sha256(body).hexdigest()
 
 
-def snapshot_from_fetch(claim: Claim, result: FetchResult) -> EvidenceSnapshot:
+def snapshot_from_fetch(
+    claim: Claim, result: FetchResult, *, trust_tier: int | None = None
+) -> EvidenceSnapshot:
     """Create a snapshot from a SafeFetcher result."""
     body = result.body
     try:
@@ -66,6 +69,7 @@ def snapshot_from_fetch(claim: Claim, result: FetchResult) -> EvidenceSnapshot:
         content_hash=content_hash(body),
         body_base64=base64.b64encode(body).decode("ascii"),
         retrieved_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        trust_tier=trust_tier,
     )
 
 
@@ -143,7 +147,7 @@ def evidence_result_from_snapshot(snapshot: EvidenceSnapshot) -> EvidenceResult:
         claim_id=snapshot.claim_id,
         status=EvidenceStatus.NEEDS_EVIDENCE,
         source=snapshot.source,
-        trust_tier=None,
+        trust_tier=snapshot.trust_tier,
         evidence_text=snapshot.evidence_text,
         content_hash=snapshot.content_hash,
         reason="Evidence captured; claim-specific validation is not implemented yet.",

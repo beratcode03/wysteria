@@ -29,6 +29,7 @@ def make_snapshot(claim, text='{"ok":true}'):
         content_hash=content_hash(text.encode()),
         body_base64=base64.b64encode(text.encode()).decode("ascii"),
         retrieved_at="2026-01-01T00:00:00Z",
+        trust_tier=1,
     )
 
 

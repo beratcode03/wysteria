@@ -128,12 +128,31 @@ def mock_dns_and_socket(mock_server):
         else:
             return orig_getaddrinfo(host, *args, **kwargs)
 
-    def fake_socket_connect(self, address):
+    created_sockets = []
+    orig_socket = socket.socket
+
+    class MockSocket(orig_socket):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            created_sockets.append(self)
+
+    def fake_socket_connect(*args, **kwargs):
+        if len(args) >= 2:
+            self_obj, address = args[0], args[1]
+        elif len(args) == 1:
+            address = args[0]
+            self_obj = created_sockets[-1] if created_sockets else None
+        else:
+            raise TypeError("fake_socket_connect missing arguments")
+
         if isinstance(address, tuple) and len(address) == 2:
             host, _ = address
             if host == "93.184.216.34":
-                return orig_socket_connect(self, ("127.0.0.1", port))
-        return orig_socket_connect(self, address)
+                address = ("127.0.0.1", port)
+
+        if self_obj is not None:
+            return orig_socket_connect(self_obj, address)
+        raise RuntimeError("No socket available to connect")
 
     def fake_create_connection(
         address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None
@@ -144,10 +163,11 @@ def mock_dns_and_socket(mock_server):
                 return orig_create_connection(("127.0.0.1", port), timeout, source_address)
         return orig_create_connection(address, timeout, source_address)
 
-    with patch("socket.getaddrinfo", side_effect=fake_getaddrinfo):
-        with patch("socket.socket.connect", new=fake_socket_connect):
-            with patch("socket.create_connection", side_effect=fake_create_connection):
-                yield port
+    with patch("socket.socket", new=MockSocket):
+        with patch("socket.getaddrinfo", side_effect=fake_getaddrinfo):
+            with patch("socket.socket.connect", side_effect=fake_socket_connect, autospec=True):
+                with patch("socket.create_connection", side_effect=fake_create_connection):
+                    yield port
 
 
 # --- 2. Redirect Tests ---

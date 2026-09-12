@@ -69,6 +69,20 @@ When `--evidence` is supplied, claims embedded in the AI proposal are matched ag
 
 **Options:** `--evidence`, `--update-snapshots`, `--evidence-dir PATH`
 
+Evidence source governance is policy-driven. `allowed_evidence_hosts` and `forbidden_evidence_hosts` use exact hostname matching; subdomains are not implicitly trusted. `evidence_host_trust_tiers` assigns deterministic tiers (`1` = highest trust, `4` = lowest), and `max_evidence_trust_tier` can reject sources above the configured ceiling.
+
+Example policy:
+```yaml
+policy_version: 1
+allowed_evidence_hosts:
+  - docs.example.com
+evidence_host_trust_tiers:
+  docs.example.com: 1
+max_evidence_trust_tier: 2
+```
+
+Snapshot mode remains offline. Update mode still requires an explicit claim `source_url`, passes through `SafeFetcher`, and applies the active evidence-host policy before network access.
+
 **Important:** Capturing evidence does not yet prove a claim. Evidence results remain `needs_evidence` until a claim-specific evidence validator is implemented.
 
 ### `wysteria compile`

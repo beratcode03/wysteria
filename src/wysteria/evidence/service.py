@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import urlparse
 
 from wysteria.evidence.fetcher import (
     BlockedAddressError,
@@ -18,6 +19,52 @@ from wysteria.evidence.snapshot import (
     save_snapshot,
     snapshot_from_fetch,
 )
+from wysteria.policy.models import Policy
+
+
+def _normalize_host(host: str) -> str:
+    value = host.strip().rstrip(".").casefold()
+    try:
+        return value.encode("idna").decode("ascii")
+    except UnicodeError:
+        return value
+
+
+def _evidence_host_policy(
+    source_url: str, policy: Policy | None
+) -> tuple[bool, int | None, str | None]:
+    """Apply exact-match evidence host policy without suffix matching."""
+    if policy is None:
+        return True, None, None
+    hostname = urlparse(source_url).hostname
+    if not hostname:
+        return False, None, "Evidence source URL has no hostname."
+    normalized = _normalize_host(hostname)
+    allowed = (
+        {_normalize_host(host) for host in policy.allowed_evidence_hosts}
+        if policy.allowed_evidence_hosts is not None
+        else None
+    )
+    forbidden = {_normalize_host(host) for host in policy.forbidden_evidence_hosts or []}
+    if normalized in forbidden:
+        return False, None, f"Evidence host '{hostname}' is explicitly forbidden by policy."
+    if allowed is not None and normalized not in allowed:
+        return False, None, f"Evidence host '{hostname}' is not in the allowed list."
+    tiers = {_normalize_host(host): tier for host, tier in policy.evidence_host_trust_tiers.items()}
+    tier = tiers.get(normalized)
+    if policy.max_evidence_trust_tier is not None:
+        if tier is None:
+            return False, None, f"Evidence host '{hostname}' has no configured trust tier."
+        if tier > policy.max_evidence_trust_tier:
+            return (
+                False,
+                tier,
+                (
+                    f"Evidence host '{hostname}' has trust tier {tier}, "
+                    f"above the policy maximum of {policy.max_evidence_trust_tier}."
+                ),
+            )
+    return True, tier, None
 
 
 def collect_evidence(
@@ -27,6 +74,7 @@ def collect_evidence(
     update_snapshots: bool = False,
     snapshot_dir: Path | None = None,
     fetcher: SafeFetcher | None = None,
+    policy: Policy | None = None,
 ) -> tuple[list[EvidenceResult], list[EvidenceSnapshot]]:
     """Load committed snapshots, optionally refreshing them from explicit claim URLs."""
     if not claims:
@@ -47,9 +95,21 @@ def collect_evidence(
                     )
                 )
                 continue
+            allowed, trust_tier, policy_reason = _evidence_host_policy(claim.source_url, policy)
+            if not allowed:
+                results.append(
+                    EvidenceResult(
+                        claim_id=claim.id,
+                        status=EvidenceStatus.BLOCKED,
+                        source=claim.source_url,
+                        trust_tier=trust_tier,
+                        reason=policy_reason,
+                    )
+                )
+                continue
             try:
                 fetched = active_fetcher.get(claim.source_url)
-                snapshot = snapshot_from_fetch(claim, fetched)
+                snapshot = snapshot_from_fetch(claim, fetched, trust_tier=trust_tier)
                 save_snapshot(snapshot, directory)
                 snapshots.append(snapshot)
                 results.append(evidence_result_from_snapshot(snapshot))
@@ -95,7 +155,29 @@ def collect_evidence(
                 )
             )
         else:
-            snapshots.append(snapshot)
-            results.append(evidence_result_from_snapshot(snapshot))
+            allowed, expected_tier, policy_reason = _evidence_host_policy(snapshot.source, policy)
+            if not allowed:
+                results.append(
+                    EvidenceResult(
+                        claim_id=claim.id,
+                        status=EvidenceStatus.BLOCKED,
+                        source=snapshot.source,
+                        trust_tier=snapshot.trust_tier,
+                        reason=policy_reason,
+                    )
+                )
+            elif expected_tier is not None and snapshot.trust_tier != expected_tier:
+                results.append(
+                    EvidenceResult(
+                        claim_id=claim.id,
+                        status=EvidenceStatus.UNVERIFIABLE,
+                        source=snapshot.source,
+                        trust_tier=snapshot.trust_tier,
+                        reason="Evidence snapshot trust tier does not match the active policy.",
+                    )
+                )
+            else:
+                snapshots.append(snapshot)
+                results.append(evidence_result_from_snapshot(snapshot))
 
     return results, snapshots

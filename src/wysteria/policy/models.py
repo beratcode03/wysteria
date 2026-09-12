@@ -70,6 +70,10 @@ class Policy(StrictModel):
     allowed_http_hosts: list[str] | None = None
     forbidden_http_hosts: list[str] | None = None
     allowed_http_methods: list[str] | None = None
+    allowed_evidence_hosts: list[str] | None = None
+    forbidden_evidence_hosts: list[str] | None = None
+    evidence_host_trust_tiers: dict[str, int] = Field(default_factory=dict)
+    max_evidence_trust_tier: int | None = Field(default=None, ge=1, le=4)
 
     @field_validator("forbidden_capabilities", "required_capabilities", mode="before")
     @classmethod

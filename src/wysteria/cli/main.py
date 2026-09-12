@@ -364,6 +364,7 @@ def check_command(
                 base_dir=proposal.parent,
                 update_snapshots=update_snapshots,
                 snapshot_dir=evidence_dir,
+                policy=policy_obj,
             )
         except OSError as err:
             _print_error("Managing evidence snapshots during check", err)
