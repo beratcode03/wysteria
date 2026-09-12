@@ -40,6 +40,7 @@ class Claim(BaseModel):
     source_url: str | None = Field(
         None, description="Explicit evidence source URL; never inferred from subject."
     )
+    node_id: str | None = Field(None, description="Optional node ID this claim is associated with.")
 
     # Optional context depending on the claim type
     operation: str | None = None

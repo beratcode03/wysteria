@@ -265,6 +265,24 @@ def load_proposal(path: str | Path) -> WorkflowProposal:
     return _load_proposal(path)
 
 
+def parse_raw_proposal(
+    text: str, *, filename: str = "<memory>", format: str | None = None
+) -> dict[str, Any]:
+    """Safely parse a workflow proposal document into untrusted raw dict data."""
+
+    from wysteria.compiler.parser import parse_raw_proposal as _parse_raw_proposal
+
+    return _parse_raw_proposal(text, filename=filename, format=format)
+
+
+def load_raw_proposal(path: str | Path) -> dict[str, Any]:
+    """Read and safely parse a workflow proposal file into untrusted raw dict data."""
+
+    from wysteria.compiler.parser import load_raw_proposal as _load_raw_proposal
+
+    return _load_raw_proposal(path)
+
+
 def compile_proposal(
     proposal: WorkflowProposal,
     *,
@@ -526,8 +544,10 @@ __all__ = [
     "load_fixture",
     "load_policy",
     "load_proposal",
+    "load_raw_proposal",
     "load_workflow",
     "parse_proposal",
+    "parse_raw_proposal",
     "save_ci_artifact",
     "validate_fixture",
     "validate_workflow",

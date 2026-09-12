@@ -34,7 +34,7 @@ class WorkflowProposal(BaseModel):
     claims: list[Claim] | None = None
 
     @model_validator(mode="after")
-    def check_duplicate_claim_ids(self) -> "WorkflowProposal":
+    def _validate_unique_claim_ids(self) -> "WorkflowProposal":
         if self.claims:
             seen = set()
             for claim in self.claims:

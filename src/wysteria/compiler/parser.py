@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
 import yaml
 from pydantic import ValidationError
@@ -11,10 +12,10 @@ from wysteria.errors import WorkflowLoadError
 from wysteria.ir.parser import DuplicateKeyLoader, _check_size, _error
 
 
-def parse_proposal(
+def parse_raw_proposal(
     text: str, *, filename: str = "<memory>", format: str | None = None
-) -> WorkflowProposal:
-    """Safely parse YAML or JSON text into a WorkflowProposal."""
+) -> dict[str, Any]:
+    """Safely parse YAML or JSON text into raw proposal data."""
     _check_size(text)
     selected = format or Path(filename).suffix.lstrip(".").lower()
 
@@ -38,10 +39,30 @@ def parse_proposal(
     if not isinstance(data, dict):
         raise _error("proposal root must be a mapping", "WYS900")
 
+    return data
+
+
+def parse_proposal(
+    text: str, *, filename: str = "<memory>", format: str | None = None
+) -> WorkflowProposal:
+    """Safely parse YAML or JSON text into a WorkflowProposal."""
+    data = parse_raw_proposal(text, filename=filename, format=format)
     try:
         return WorkflowProposal.model_validate(data)
     except ValidationError as error:
         raise _error(f"invalid proposal structure: {error}", "WYS900") from error
+
+
+def load_raw_proposal(path: str | Path) -> dict[str, Any]:
+    """Read and safely parse a workflow proposal file into raw data."""
+    source = Path(path)
+    if not source.is_file():
+        raise WorkflowLoadError(f"proposal path is not a readable regular file: {source}")
+    try:
+        text = source.read_text(encoding="utf-8")
+    except OSError as error:
+        raise WorkflowLoadError(f"cannot read {source}: {error}") from error
+    return parse_raw_proposal(text, filename=str(source))
 
 
 def load_proposal(path: str | Path) -> WorkflowProposal:

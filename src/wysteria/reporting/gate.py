@@ -8,8 +8,8 @@ from wysteria.diff.models import DiffSeverity, WorkflowDiff
 from wysteria.reporting.models import GateDecision, GateSummary, ReportStatus
 
 if TYPE_CHECKING:
-    from wysteria.policy.models import PolicyResult
     from wysteria.evidence.models import EvidenceResult
+    from wysteria.policy.models import PolicyResult
 
 
 def evaluate_gate(

@@ -44,7 +44,6 @@ from wysteria.api import (
     load_ci_artifact,
     load_fixture_document,
     load_policy,
-    load_proposal,
     load_workflow,
     save_ci_artifact,
     validate_workflow,
@@ -301,7 +300,9 @@ def check_command(
         raise typer.Exit(4)
 
     try:
-        parsed_prop = load_proposal(proposal)
+        from wysteria.api import load_raw_proposal
+
+        raw_prop = load_raw_proposal(proposal)
     except (WorkflowLoadError, WorkflowParseError) as err:
         if output_format == "json":
             typer.echo(
@@ -336,7 +337,7 @@ def check_command(
                     allowed.remove(c)
         cap_policy = CapabilityPolicy(allowed=frozenset(allowed))
 
-    result = compile_proposal(parsed_prop, filename=str(proposal), policy=cap_policy)
+    result = compile_proposal(raw_prop, filename=str(proposal), policy=cap_policy)
 
     if not result.success or result.workflow is None:
         if output_format == "json":
@@ -352,6 +353,10 @@ def check_command(
             for d in result.diagnostics:
                 typer.echo(f"error {d.code}: {d.message}", err=True)
         raise typer.Exit(2)  # WYS400+ or WYS100+ is validation/structure failure
+
+    from wysteria.compiler.models import WorkflowProposal
+
+    parsed_prop = WorkflowProposal.model_validate(raw_prop)
 
     compiled_wf_json = normalize_workflow(result.workflow)
     parsed_wf = ParsedWorkflow(data=compiled_wf_json, filename=str(proposal), locations={})
@@ -473,7 +478,9 @@ def compile_command(
         raise typer.Exit(4)
 
     try:
-        parsed_prop = load_proposal(proposal)
+        from wysteria.api import load_raw_proposal
+
+        raw_prop = load_raw_proposal(proposal)
     except (WorkflowLoadError, WorkflowParseError) as err:
         if output_format == "json":
             typer.echo(
@@ -508,7 +515,7 @@ def compile_command(
                     allowed.remove(c)
         cap_policy = CapabilityPolicy(allowed=frozenset(allowed))
 
-    result = compile_proposal(parsed_prop, filename=str(proposal), policy=cap_policy)
+    result = compile_proposal(raw_prop, filename=str(proposal), policy=cap_policy)
 
     if not result.success or result.workflow is None:
         if output_format == "json":
