@@ -5,6 +5,35 @@ from wysteria.cli.main import app
 runner = CliRunner()
 
 
+def test_version_cli():
+    result = runner.invoke(app, ["--version"])
+    assert result.exit_code == 0
+    import wysteria
+
+    assert wysteria.__version__ in result.stdout
+
+
+def test_root_help():
+    result = runner.invoke(app, ["--help"], prog_name="wysteria")
+    assert result.exit_code == 0
+    assert "Usage: wysteria" in result.stdout
+
+
+def test_subcommand_help():
+    for cmd in ["validate", "verify", "compile", "diff", "policy"]:
+        result = runner.invoke(app, [cmd, "--help"], prog_name="wysteria")
+        assert result.exit_code == 0
+        assert "Usage: wysteria" in result.stdout
+
+
+def test_cli_diagnostic_action_names(tmp_path):
+    path = tmp_path / "workflow.yaml"
+    path.write_text("invalid_yaml: [\n", encoding="utf-8")
+    result = runner.invoke(app, ["validate", str(path)])
+    assert result.exit_code == 3
+    assert "Action:  Validating workflow" in result.stderr
+
+
 def test_validate_cli_success(tmp_path):
     path = tmp_path / "workflow.yaml"
     path.write_text(

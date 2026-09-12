@@ -75,6 +75,12 @@ uv run ruff format --check .
 
 ## CLI
 
+### Check version
+
+```text
+wysteria --version
+```
+
 ### Validate a workflow
 
 ```text
