@@ -45,6 +45,24 @@ It serves as the canonical source for command behaviors.
 
 **Errors/Security Considerations:** Subject to local file permissions and standard input validation. No RCE or network impact.
 
+### `wysteria check`
+
+**What it is:** Safely ingest and evaluate an untrusted AI-generated workflow proposal.
+
+**What it does:** Safely ingest and evaluate an untrusted AI-generated workflow proposal
+
+**Syntax:** `wysteria check [OPTIONS] [ARGS]`
+
+**Example:** `wysteria check --help`
+
+**Required Permission:** None (Local OS User execution)
+
+**Who can use it:** Any developer with local file read access.
+
+**State/Data Impact:** Pure function / Read-only (unless generating artifacts/baselines locally). No database or external state modified.
+
+**Errors/Security Considerations:** Subject to local file permissions and standard input validation. No RCE or network impact.
+
 ### `wysteria compile`
 
 **What it is:** Deterministically compile a WorkflowProposal into a trusted typed Workflow IR.

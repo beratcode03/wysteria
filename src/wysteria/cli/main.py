@@ -255,6 +255,151 @@ def validate(
     raise typer.Exit(2 if result.blocked else 1)
 
 
+@app.command(name="check")
+def check_command(
+    proposal: Annotated[
+        Path, typer.Argument(metavar="PROPOSAL", help="Untrusted AI Proposal YAML or JSON file.")
+    ],
+    fixture: Annotated[
+        Path | None, typer.Option("--fixture", "-f", help="Fixture for verification.")
+    ] = None,
+    policy: Annotated[
+        Path | None, typer.Option("--policy", "-p", help="Optional policy YAML or JSON file.")
+    ] = None,
+    output_format: Annotated[str, typer.Option("--format", help="human or json")] = "human",
+    github_annotations: Annotated[
+        bool,
+        typer.Option(
+            "--github-annotations",
+            help="Emit GitHub Actions workflow commands (::error, ::warning).",
+        ),
+    ] = False,
+) -> None:
+    """Safely ingest and evaluate an untrusted AI-generated workflow proposal."""
+    if output_format not in {"human", "json"}:
+        typer.echo("error WYS900: --format must be 'human' or 'json'", err=True)
+        raise typer.Exit(4)
+
+    try:
+        parsed_prop = load_proposal(proposal)
+    except (WorkflowLoadError, WorkflowParseError) as err:
+        if output_format == "json":
+            typer.echo(
+                json.dumps(
+                    {
+                        "success": False,
+                        "diagnostics": [
+                            {"code": "WYS900", "severity": "error", "message": str(err)}
+                        ],
+                    }
+                ),
+                err=True,
+            )
+        else:
+            _print_error("Loading proposal during check", err)
+        raise typer.Exit(2) from err
+
+    policy_obj = None
+    if policy:
+        try:
+            policy_obj = load_policy(policy)
+        except Exception as err:
+            _print_error("Loading policy during check", err)
+            raise typer.Exit(3) from err
+
+    cap_policy = None
+    if policy_obj:
+        allowed = set(Capability)
+        if policy_obj.forbidden_capabilities:
+            for c in policy_obj.forbidden_capabilities:
+                if c in allowed:
+                    allowed.remove(c)
+        cap_policy = CapabilityPolicy(allowed=frozenset(allowed))
+
+    result = compile_proposal(parsed_prop, filename=str(proposal), policy=cap_policy)
+
+    if not result.success or result.workflow is None:
+        if output_format == "json":
+            typer.echo(
+                json.dumps(
+                    {
+                        "success": False,
+                        "diagnostics": [d.model_dump(mode="json") for d in result.diagnostics],
+                    }
+                )
+            )
+        else:
+            for d in result.diagnostics:
+                typer.echo(f"error {d.code}: {d.message}", err=True)
+        raise typer.Exit(2)  # WYS400+ or WYS100+ is validation/structure failure
+
+    compiled_wf_json = normalize_workflow(result.workflow)
+    parsed_wf = ParsedWorkflow(data=compiled_wf_json, filename=str(proposal), locations={})
+
+    if fixture is None:
+        # Without a fixture, just policy check & validate
+        policy_res = None
+        if policy_obj:
+            policy_res = evaluate_policy(result.workflow, policy_obj)
+
+        dev_report = build_developer_report(
+            VerificationResult(
+                status=VerificationStatus.PASSED,
+                success=True,
+                fixture_id="<none>",
+                diagnostics=[],
+            ),
+            workflow=parsed_wf,
+            workflow_display=str(proposal),
+            policy_result=policy_res,
+        )
+        if output_format == "json":
+            typer.echo(format_verification_json(dev_report))
+        else:
+            typer.echo(format_verification_report(dev_report))
+
+        if dev_report.provenance.gate_decision != GateDecision.PASS:
+            raise typer.Exit(1)
+        raise typer.Exit(0)
+
+    # With a fixture, run deterministic verification
+    parsed_fix = None
+    try:
+        parsed_fix = load_fixture_document(fixture)
+    except Exception as err:
+        _print_error("Loading fixture during check", err)
+        raise typer.Exit(3) from err
+
+    verify_result = verify_fixture(parsed_wf, parsed_fix, policy=cap_policy)
+
+    policy_res = None
+    if policy_obj:
+        policy_res = evaluate_policy(result.workflow, policy_obj)
+
+    dev_report = build_developer_report(
+        verify_result,
+        workflow=parsed_wf,
+        fixture=parsed_fix,
+        workflow_display=str(proposal),
+        fixture_display=str(fixture),
+        policy_result=policy_res,
+    )
+
+    if github_annotations:
+        for ann in format_github_annotations(dev_report):
+            typer.echo(ann, err=True)
+
+    if output_format == "json":
+        typer.echo(format_verification_json(dev_report))
+    else:
+        typer.echo(format_verification_report(dev_report))
+
+    exit_code = EXIT_CODES.get(verify_result.status, 4)
+    if exit_code == 0 and dev_report.provenance.gate_decision != GateDecision.PASS:
+        exit_code = 1
+    raise typer.Exit(exit_code)
+
+
 @app.command(name="compile")
 def compile_command(
     proposal: Annotated[
