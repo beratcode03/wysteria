@@ -524,7 +524,12 @@ def build_developer_report(
         k: result.actual_assertions[k] for k in sorted(result.actual_assertions.keys())
     }
 
-    gate_summary = evaluate_gate(status, workflow_diff, policy_result=policy_result)
+    gate_summary = evaluate_gate(
+        status,
+        workflow_diff,
+        policy_result=policy_result,
+        evidence_results=evidence_results,
+    )
     prov = build_provenance(
         workflow_id=workflow_id,
         fixture_id=fixture_id_model,

@@ -14,11 +14,11 @@ from wysteria.evidence.models import Claim, EvidenceResult, EvidenceStatus
 from wysteria.evidence.snapshot import (
     EvidenceSnapshot,
     default_snapshot_dir,
-    evidence_result_from_snapshot,
     load_snapshot,
     save_snapshot,
     snapshot_from_fetch,
 )
+from wysteria.evidence.verifier import verify_claim
 from wysteria.policy.models import Policy
 
 
@@ -112,7 +112,7 @@ def collect_evidence(
                 snapshot = snapshot_from_fetch(claim, fetched, trust_tier=trust_tier)
                 save_snapshot(snapshot, directory)
                 snapshots.append(snapshot)
-                results.append(evidence_result_from_snapshot(snapshot))
+                results.append(verify_claim(claim, snapshot))
             except BlockedAddressError as exc:
                 results.append(
                     EvidenceResult(
@@ -178,6 +178,6 @@ def collect_evidence(
                 )
             else:
                 snapshots.append(snapshot)
-                results.append(evidence_result_from_snapshot(snapshot))
+                results.append(verify_claim(claim, snapshot))
 
     return results, snapshots

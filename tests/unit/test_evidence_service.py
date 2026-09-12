@@ -29,7 +29,7 @@ def test_collect_update_writes_snapshot(tmp_path: Path):
     results, snapshots = collect_evidence(
         [claim], base_dir=tmp_path, update_snapshots=True, fetcher=FakeFetcher()
     )
-    assert results[0].status == EvidenceStatus.NEEDS_EVIDENCE
+    assert results[0].status == EvidenceStatus.UNVERIFIABLE
     assert len(snapshots) == 1
     assert list((tmp_path / ".wysteria" / "evidence").glob("*.json"))
 

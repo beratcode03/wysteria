@@ -9,16 +9,18 @@ from wysteria.reporting.models import GateDecision, GateSummary, ReportStatus
 
 if TYPE_CHECKING:
     from wysteria.policy.models import PolicyResult
+    from wysteria.evidence.models import EvidenceResult
 
 
 def evaluate_gate(
     status: ReportStatus,
     workflow_diff: WorkflowDiff | None = None,
     policy_result: PolicyResult | None = None,
+    evidence_results: list[EvidenceResult] | None = None,
 ) -> GateSummary:
     """
     Evaluate whether a changed workflow is safe to accept based on its verification report,
-    semantic diff, and policy evaluation.
+    semantic diff, policy evaluation, and evidence results.
     Returns a deterministic PASS/FAIL/BLOCK decision with sorted reasons.
     """
     reasons: list[str] = []
@@ -59,6 +61,16 @@ def evaluate_gate(
                     break
             if has_non_info:
                 reasons.append("non-informational workflow changes")
+
+    # Check evidence results
+    if evidence_results is not None:
+        for ev in evidence_results:
+            if ev.status.value != "verified":
+                if ev.status.value == "blocked":
+                    has_policy_block = True
+                    reasons.append(f"evidence claim '{ev.claim_id}' blocked by policy")
+                else:
+                    reasons.append(f"evidence claim '{ev.claim_id}' is {ev.status.value}")
 
     if has_policy_block:
         return GateSummary(decision=GateDecision.BLOCK, reasons=sorted(reasons))

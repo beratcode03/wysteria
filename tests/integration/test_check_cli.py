@@ -200,5 +200,5 @@ def test_check_evidence_uses_existing_snapshot_without_network(tmp_path: Path):
     )
     result = runner.invoke(app, ["check", str(prop_file), "--evidence"])
     assert result.exit_code == 1
-    assert "needs_evidence" in result.stdout
+    assert "unverifiable" in result.stdout
     assert "https://example.com/api" in result.stdout
