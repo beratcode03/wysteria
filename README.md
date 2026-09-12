@@ -75,6 +75,8 @@ uv run ruff format --check .
 
 ## CLI
 
+See the complete [Command Catalog](docs/COMMAND_CATALOG.md) for a detailed breakdown of all available commands, their purpose, execution context, and security considerations.
+
 ### Check version
 
 ```text
