@@ -450,7 +450,7 @@ def test_repository_example_ci_scenario_passes(tmp_path):
             "--github-annotations",
         ],
     )
-    assert res_baseline.exit_code == 0
+    assert res_baseline.exit_code == 0, res_baseline.stdout
     assert "MATCH" in res_baseline.stdout
     assert base_report_file.is_file()
 

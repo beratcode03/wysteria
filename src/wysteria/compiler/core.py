@@ -89,6 +89,7 @@ def compile_proposal(
                 valid_node_ids.add(node["id"])
 
     seen_claim_ids = set()
+    valid_claims = []
     if raw_claims:
         for i, claim_data in enumerate(raw_claims):
             if isinstance(claim_data, dict):
@@ -119,6 +120,7 @@ def compile_proposal(
                 )
                 valid = False
             seen_claim_ids.add(claim.id)
+            valid_claims.append(claim)
 
             if claim.type == "unknown":
                 diagnostics.append(
@@ -150,6 +152,9 @@ def compile_proposal(
                     )
                 )
                 valid = False
+
+    if valid and validation_result.workflow:
+        validation_result.workflow.claims = valid_claims
 
     return CompilationResult(
         success=valid,

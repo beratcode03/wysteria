@@ -250,12 +250,41 @@ class Capability(StrEnum):
 CapabilityField = Annotated[Capability, BeforeValidator(_enum_value(Capability))]
 
 
+class ClaimType(StrEnum):
+    API_ENDPOINT = "api_endpoint"
+    JSON_SCHEMA = "json_schema"
+    FACTUAL = "factual"
+    UNKNOWN = "unknown"
+
+
+ClaimTypeField = Annotated[ClaimType, BeforeValidator(_enum_value(ClaimType))]
+
+
+class Claim(StrictModel):
+    """A structured claim made by an AI output requiring external evidence."""
+
+    id: str = Field(..., description="Unique identifier for the claim in this proposal.")
+    type: ClaimTypeField = ClaimType.UNKNOWN
+    subject: str = Field(..., description="The subject or domain of the claim (e.g. 'Stripe API').")
+    source_url: str | None = Field(
+        None, description="Explicit evidence source URL; never inferred from subject."
+    )
+    node_id: str | None = Field(None, description="Optional node ID this claim is associated with.")
+
+    # Optional context depending on the claim type
+    operation: str | None = None
+    path: str | None = None
+    expected_status: int | None = None
+    description: str | None = None
+
+
 MAX_NODES = 500
 MAX_EDGES = 1000
 MAX_INPUTS = 100
 MAX_OUTPUTS = 100
 MAX_ASSERTIONS = 200
 MAX_CAPABILITIES = 50
+MAX_CLAIMS = 100
 
 
 class Workflow(StrictModel):
@@ -270,3 +299,4 @@ class Workflow(StrictModel):
     capabilities: list[CapabilityField] = Field(default_factory=list, max_length=MAX_CAPABILITIES)
     assertions: list[Assertion] = Field(default_factory=list, max_length=MAX_ASSERTIONS)
     outputs: dict[str, OutputSpec] = Field(..., max_length=MAX_OUTPUTS)
+    claims: list[Claim] = Field(default_factory=list, max_length=MAX_CLAIMS)

@@ -378,6 +378,57 @@ def diff_workflows(
                     )
                 )
 
+    # 5.5 Claims changes
+    old_claims = {c.id: c for c in getattr(old_workflow, "claims", [])}
+    new_claims = {c.id: c for c in getattr(new_workflow, "claims", [])}
+    all_claim_ids = sorted(set(old_claims.keys()) | set(new_claims.keys()))
+    for cid in all_claim_ids:
+        in_old = cid in old_claims
+        in_new = cid in new_claims
+
+        if in_old and not in_new:
+            changes.append(
+                SemanticChange(
+                    category=ChangeCategory.CLAIM_CHANGED,
+                    change_type="claim_removed",
+                    severity=DiffSeverity.BREAKING,
+                    target_id=cid,
+                    path=f"claims/{cid}",
+                    before=old_claims[cid].model_dump(mode="json"),
+                    after=None,
+                    explanation=f"Evidence claim '{cid}' removed",
+                )
+            )
+        elif not in_old and in_new:
+            changes.append(
+                SemanticChange(
+                    category=ChangeCategory.CLAIM_CHANGED,
+                    change_type="claim_added",
+                    severity=DiffSeverity.INFO,
+                    target_id=cid,
+                    path=f"claims/{cid}",
+                    before=None,
+                    after=new_claims[cid].model_dump(mode="json"),
+                    explanation=f"Evidence claim '{cid}' added",
+                )
+            )
+        else:
+            old_c = old_claims[cid]
+            new_c = new_claims[cid]
+            if old_c.model_dump(mode="json") != new_c.model_dump(mode="json"):
+                changes.append(
+                    SemanticChange(
+                        category=ChangeCategory.CLAIM_CHANGED,
+                        change_type="claim_changed",
+                        severity=DiffSeverity.BREAKING,
+                        target_id=cid,
+                        path=f"claims/{cid}",
+                        before=old_c.model_dump(mode="json"),
+                        after=new_c.model_dump(mode="json"),
+                        explanation=f"Evidence claim '{cid}' changed",
+                    )
+                )
+
     # 6. Nodes changes
     old_nodes = {n.id: n for n in old_workflow.nodes}
     new_nodes = {n.id: n for n in new_workflow.nodes}

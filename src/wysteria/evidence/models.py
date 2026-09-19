@@ -3,19 +3,9 @@
 from enum import StrEnum
 from typing import Annotated
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict
 
-from wysteria.ir.models import _enum_value
-
-
-class ClaimType(StrEnum):
-    API_ENDPOINT = "api_endpoint"
-    JSON_SCHEMA = "json_schema"
-    FACTUAL = "factual"
-    UNKNOWN = "unknown"
-
-
-ClaimTypeField = Annotated[ClaimType, BeforeValidator(_enum_value(ClaimType))]
+from wysteria.ir.models import ClaimTypeField, _enum_value
 
 
 class EvidenceStatus(StrEnum):
@@ -27,26 +17,6 @@ class EvidenceStatus(StrEnum):
 
 
 EvidenceStatusField = Annotated[EvidenceStatus, BeforeValidator(_enum_value(EvidenceStatus))]
-
-
-class Claim(BaseModel):
-    """A structured claim made by an AI output requiring external evidence."""
-
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    id: str = Field(..., description="Unique identifier for the claim in this proposal.")
-    type: ClaimTypeField = ClaimType.UNKNOWN
-    subject: str = Field(..., description="The subject or domain of the claim (e.g. 'Stripe API').")
-    source_url: str | None = Field(
-        None, description="Explicit evidence source URL; never inferred from subject."
-    )
-    node_id: str | None = Field(None, description="Optional node ID this claim is associated with.")
-
-    # Optional context depending on the claim type
-    operation: str | None = None
-    path: str | None = None
-    expected_status: int | None = None
-    description: str | None = None
 
 
 class EvidenceResult(BaseModel):

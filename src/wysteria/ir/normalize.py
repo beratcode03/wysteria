@@ -24,6 +24,11 @@ def normalize_workflow(workflow: Workflow) -> dict[str, Any]:
         normalized["assertions"], key=lambda assertion: assertion["id"]
     )
     normalized["capabilities"] = sorted(normalized["capabilities"])
+    if "claims" in normalized:
+        if not normalized["claims"]:
+            del normalized["claims"]
+        else:
+            normalized["claims"] = sorted(normalized["claims"], key=lambda claim: claim["id"])
     return normalized
 
 

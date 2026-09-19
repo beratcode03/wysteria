@@ -598,6 +598,22 @@ def verify(
             help="Emit GitHub Actions workflow commands (::error, ::warning).",
         ),
     ] = False,
+    evidence: Annotated[
+        bool,
+        typer.Option("--evidence", help="Use committed evidence snapshots without network access."),
+    ] = False,
+    update_snapshots: Annotated[
+        bool,
+        typer.Option(
+            "--update-snapshots", help="Refresh evidence snapshots from explicit claim URLs."
+        ),
+    ] = False,
+    evidence_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--evidence-dir", help="Evidence snapshot directory (default: .wysteria/evidence)."
+        ),
+    ] = None,
 ) -> None:
     """Verify a workflow proposal deterministically against a fixture."""
 
@@ -658,15 +674,26 @@ def verify(
         assert parsed_fix is not None
         result = verify_fixture(parsed_wf, parsed_fix, policy=cap_policy)
 
+    val_wf = None
     policy_res = None
-    if (
-        policy_obj is not None
-        and result.status != VerificationStatus.INVALID_WORKFLOW
-        and parsed_wf is not None
-    ):
+    if parsed_wf is not None and result.status != VerificationStatus.INVALID_WORKFLOW:
         val_wf = validate_workflow(parsed_wf, policy=cap_policy)
-        if val_wf.valid and val_wf.workflow is not None:
+        if val_wf.valid and val_wf.workflow is not None and policy_obj is not None:
             policy_res = evaluate_policy(val_wf.workflow, policy_obj)
+
+    evidence_results = None
+    if evidence and val_wf is not None and val_wf.valid and val_wf.workflow is not None:
+        try:
+            evidence_results, _ = collect_evidence(
+                val_wf.workflow.claims,
+                base_dir=workflow.parent,
+                update_snapshots=update_snapshots,
+                snapshot_dir=evidence_dir,
+                policy=policy_obj,
+            )
+        except OSError as err:
+            _print_error("Managing evidence snapshots during verify", err)
+            raise typer.Exit(5) from err
 
     workflow_display = str(workflow)
     fixture_display = (
@@ -681,6 +708,7 @@ def verify(
         workflow_display=workflow_display,
         fixture_display=fixture_display,
         policy_result=policy_res,
+        evidence_results=evidence_results,
     )
 
     if report_file is not None:
@@ -697,7 +725,13 @@ def verify(
         typer.echo(format_verification_report(dev_report))
 
     exit_code = EXIT_CODES.get(result.status, 4)
-    if exit_code == 0 and policy_res is not None and not policy_res.passed:
+    if exit_code == 0 and dev_report.provenance.gate_decision != GateDecision.PASS:
+        exit_code = 1
+    if (
+        exit_code == 0
+        and evidence_results
+        and any(item.status.value != "verified" for item in evidence_results)
+    ):
         exit_code = 1
     raise typer.Exit(exit_code)
 
