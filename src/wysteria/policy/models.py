@@ -8,6 +8,7 @@ from typing import Any, Literal
 
 from pydantic import Field, field_validator
 
+from wysteria.diff.models import ChangeCategory
 from wysteria.ir.models import (
     CapabilityField,
     StrictModel,
@@ -74,6 +75,8 @@ class Policy(StrictModel):
     forbidden_evidence_hosts: list[str] | None = None
     evidence_host_trust_tiers: dict[str, int] = Field(default_factory=dict)
     max_evidence_trust_tier: int | None = Field(default=None, ge=1, le=4)
+    allowed_change_categories: list[ChangeCategory] | None = None
+    forbidden_change_categories: list[ChangeCategory] | None = None
 
     @field_validator("forbidden_capabilities", "required_capabilities", mode="before")
     @classmethod

@@ -391,6 +391,7 @@ def check_command(
             workflow=parsed_wf,
             workflow_display=str(proposal),
             policy_result=policy_res,
+            policy=policy_obj,
             evidence_results=evidence_results,
         )
         if output_format == "json":
@@ -425,6 +426,7 @@ def check_command(
         workflow_display=str(proposal),
         fixture_display=str(fixture),
         policy_result=policy_res,
+        policy=policy_obj,
         evidence_results=evidence_results,
     )
 
@@ -708,6 +710,7 @@ def verify(
         workflow_display=workflow_display,
         fixture_display=fixture_display,
         policy_result=policy_res,
+        policy=policy_obj,
         evidence_results=evidence_results,
     )
 
@@ -900,6 +903,7 @@ def explain(
         baseline_comparison=comparison,
         workflow_diff=diff_res,
         policy_result=policy_res,
+        policy=policy,
     )
 
     provenance = dev_report.provenance
@@ -1695,6 +1699,7 @@ def artifact_generate(
         baseline_comparison=comparison,
         workflow_diff=diff_res,
         policy_result=policy_res,
+        policy=policy,
     )
 
     artifact = build_ci_artifact(dev_report)
@@ -1830,6 +1835,7 @@ def demo(
                 workflow_display=str(wf_path).replace("\\", "/"),
                 fixture_display=str(fixture_path).replace("\\", "/"),
                 policy_result=policy_res,
+                policy=policy,
             )
             return dev_report
 

@@ -12,7 +12,8 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from wysteria.evidence.fetcher import FetchResult
-from wysteria.evidence.models import Claim, EvidenceResult, EvidenceStatus
+from wysteria.evidence.models import EvidenceResult, EvidenceStatus
+from wysteria.ir.models import Claim
 
 CURRENT_SNAPSHOT_VERSION = 1
 

@@ -172,8 +172,8 @@ def test_check_update_snapshots_requires_evidence(tmp_path: Path):
 
 
 def test_check_evidence_uses_existing_snapshot_without_network(tmp_path: Path):
-    from wysteria.evidence.models import Claim
     from wysteria.evidence.snapshot import EvidenceSnapshot, claim_hash, content_hash, save_snapshot
+    from wysteria.ir.models import Claim
 
     prop_file = tmp_path / "proposal.yaml"
     prop_file.write_text(EVIDENCE_PROPOSAL)

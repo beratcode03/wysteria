@@ -389,7 +389,7 @@ def diff_workflows(
         if in_old and not in_new:
             changes.append(
                 SemanticChange(
-                    category=ChangeCategory.CLAIM_CHANGED,
+                    category=ChangeCategory.CLAIM_REMOVED,
                     change_type="claim_removed",
                     severity=DiffSeverity.BREAKING,
                     target_id=cid,
@@ -402,7 +402,7 @@ def diff_workflows(
         elif not in_old and in_new:
             changes.append(
                 SemanticChange(
-                    category=ChangeCategory.CLAIM_CHANGED,
+                    category=ChangeCategory.CLAIM_ADDED,
                     change_type="claim_added",
                     severity=DiffSeverity.INFO,
                     target_id=cid,

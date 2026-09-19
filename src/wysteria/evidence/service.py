@@ -10,7 +10,7 @@ from wysteria.evidence.fetcher import (
     FetchError,
     SafeFetcher,
 )
-from wysteria.evidence.models import Claim, EvidenceResult, EvidenceStatus
+from wysteria.evidence.models import EvidenceResult, EvidenceStatus
 from wysteria.evidence.snapshot import (
     EvidenceSnapshot,
     default_snapshot_dir,
@@ -19,6 +19,7 @@ from wysteria.evidence.snapshot import (
     snapshot_from_fetch,
 )
 from wysteria.evidence.verifier import verify_claim
+from wysteria.ir.models import Claim
 from wysteria.policy.models import Policy
 
 

@@ -210,7 +210,8 @@ from wysteria.artifact import (
     validate_ci_artifact,
 )
 from wysteria.evidence.fetcher import SafeFetcher
-from wysteria.evidence.models import Claim, ClaimType, EvidenceResult, EvidenceStatus
+from wysteria.evidence.models import EvidenceResult, EvidenceStatus
+from wysteria.ir.models import Claim, ClaimType
 from wysteria.evidence.service import collect_evidence
 from wysteria.evidence.snapshot import (
     EvidenceSnapshot,

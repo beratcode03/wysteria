@@ -792,3 +792,88 @@ inputs:
     parsed_report = json.loads(report_json)
     assert "workflow_diff" in parsed_report
     assert parsed_report["workflow_diff"]["summary"]["breaking_count"] == 1
+
+
+def _make_wf(claims=None):
+    return json.dumps(
+        {
+            "name": "test",
+            "ir_version": 1,
+            "nodes": [
+                {
+                    "id": "n1",
+                    "kind": "constant",
+                    "output_type": "string",
+                    "config": {"value": "hello"},
+                }
+            ],
+            "outputs": {"res": {"source": {"node": "n1"}, "type": "string"}},
+            "claims": claims or [],
+        }
+    )
+
+
+def test_diff_claim_added():
+    old_wf = validate_workflow(parse_workflow(_make_wf(), format="json")).workflow
+    new_wf = validate_workflow(
+        parse_workflow(
+            _make_wf([{"id": "c1", "type": "factual", "subject": "test"}]), format="json"
+        )
+    ).workflow
+    diff = diff_workflows(old_wf, new_wf)
+    assert not diff.identical
+    assert len(diff.changes) == 1
+    assert diff.changes[0].category == ChangeCategory.CLAIM_ADDED
+    assert diff.changes[0].change_type == "claim_added"
+
+
+def test_diff_claim_removed():
+    old_wf = validate_workflow(
+        parse_workflow(
+            _make_wf([{"id": "c1", "type": "factual", "subject": "test"}]), format="json"
+        )
+    ).workflow
+    new_wf = validate_workflow(parse_workflow(_make_wf(), format="json")).workflow
+    diff = diff_workflows(old_wf, new_wf)
+    assert not diff.identical
+    assert len(diff.changes) == 1
+    assert diff.changes[0].category == ChangeCategory.CLAIM_REMOVED
+    assert diff.changes[0].change_type == "claim_removed"
+
+
+def test_diff_claim_changed():
+    old_wf = validate_workflow(
+        parse_workflow(
+            _make_wf([{"id": "c1", "type": "factual", "subject": "test"}]), format="json"
+        )
+    ).workflow
+    new_wf = validate_workflow(
+        parse_workflow(
+            _make_wf([{"id": "c1", "type": "factual", "subject": "test2"}]), format="json"
+        )
+    ).workflow
+    diff = diff_workflows(old_wf, new_wf)
+    assert not diff.identical
+    assert len(diff.changes) == 1
+    assert diff.changes[0].category == ChangeCategory.CLAIM_CHANGED
+    assert diff.changes[0].change_type == "claim_changed"
+
+
+def test_diff_claim_id_rename():
+    old_wf = validate_workflow(
+        parse_workflow(
+            _make_wf([{"id": "c1", "type": "factual", "subject": "test"}]), format="json"
+        )
+    ).workflow
+    new_wf = validate_workflow(
+        parse_workflow(
+            _make_wf([{"id": "c2", "type": "factual", "subject": "test"}]), format="json"
+        )
+    ).workflow
+    diff = diff_workflows(old_wf, new_wf)
+    assert not diff.identical
+    assert len(diff.changes) == 2
+    cats = {c.category for c in diff.changes}
+    assert ChangeCategory.CLAIM_REMOVED in cats
+    assert ChangeCategory.CLAIM_ADDED in cats
+    assert ChangeCategory.CLAIM_CHANGED not in cats

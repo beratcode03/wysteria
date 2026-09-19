@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from wysteria.fixtures.parser import ParsedFixture
     from wysteria.ir.models import Workflow
     from wysteria.ir.parser import ParsedWorkflow
-    from wysteria.policy.models import PolicyResult
+    from wysteria.policy.models import Policy, PolicyResult
 
 
 def _format_value(val: Any) -> str:
@@ -296,6 +296,7 @@ def build_developer_report(
     workflow_diff: WorkflowDiff | None = None,
     policy_result: PolicyResult | None = None,
     evidence_results: list[EvidenceResult] | None = None,
+    policy: Policy | None = None,
 ) -> DeveloperReport:
     """Build a stable, presentation-independent DeveloperReport from a VerificationResult."""
     # 1. Workflow identity
@@ -529,6 +530,7 @@ def build_developer_report(
         workflow_diff,
         policy_result=policy_result,
         evidence_results=evidence_results,
+        policy=policy,
     )
     prov = build_provenance(
         workflow_id=workflow_id,

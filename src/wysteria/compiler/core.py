@@ -74,7 +74,7 @@ def compile_proposal(
 
     # Feed through the trusted validation pipeline
     from wysteria.api import validate_workflow
-    from wysteria.evidence.models import Claim
+    from wysteria.ir.models import Claim
 
     validation_result = validate_workflow(parsed, policy=policy)
 

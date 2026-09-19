@@ -3,7 +3,6 @@ from pathlib import Path
 
 import pytest
 
-from wysteria.evidence.models import Claim
 from wysteria.evidence.snapshot import (
     EvidenceSnapshot,
     claim_hash,
@@ -11,6 +10,7 @@ from wysteria.evidence.snapshot import (
     load_snapshot,
     save_snapshot,
 )
+from wysteria.ir.models import Claim
 
 
 def make_claim(**extra):

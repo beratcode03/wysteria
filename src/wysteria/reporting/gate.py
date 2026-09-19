@@ -9,7 +9,7 @@ from wysteria.reporting.models import GateDecision, GateSummary, ReportStatus
 
 if TYPE_CHECKING:
     from wysteria.evidence.models import EvidenceResult
-    from wysteria.policy.models import PolicyResult
+    from wysteria.policy.models import Policy, PolicyResult
 
 
 def evaluate_gate(
@@ -17,6 +17,7 @@ def evaluate_gate(
     workflow_diff: WorkflowDiff | None = None,
     policy_result: PolicyResult | None = None,
     evidence_results: list[EvidenceResult] | None = None,
+    policy: Policy | None = None,
 ) -> GateSummary:
     """
     Evaluate whether a changed workflow is safe to accept based on its verification report,
@@ -25,6 +26,7 @@ def evaluate_gate(
     """
     reasons: list[str] = []
     has_policy_block = False
+    has_policy_fail = False
 
     # Check policy result first
     if policy_result is not None and not policy_result.passed:
@@ -61,6 +63,25 @@ def evaluate_gate(
                     break
             if has_non_info:
                 reasons.append("non-informational workflow changes")
+
+        # Evaluate Change Policy
+        if policy is not None and not workflow_diff.identical:
+            for change in workflow_diff.changes:
+                if (
+                    policy.forbidden_change_categories
+                    and change.category in policy.forbidden_change_categories
+                ):
+                    reasons.append(
+                        f"change category '{change.category.value}' is explicitly forbidden by policy"
+                    )
+                elif (
+                    policy.allowed_change_categories
+                    and change.category not in policy.allowed_change_categories
+                ):
+                    # If allowed_change_categories is defined, it acts as an explicit allowlist.
+                    reasons.append(
+                        f"change category '{change.category.value}' is not explicitly allowed by policy"
+                    )
 
     # Check evidence results
     if evidence_results is not None:

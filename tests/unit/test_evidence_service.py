@@ -1,8 +1,9 @@
 from pathlib import Path
 
 from wysteria.evidence.fetcher import FetchResult
-from wysteria.evidence.models import Claim, EvidenceStatus
+from wysteria.evidence.models import EvidenceStatus
 from wysteria.evidence.service import collect_evidence
+from wysteria.ir.models import Claim
 from wysteria.policy.models import Policy
 
 

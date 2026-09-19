@@ -2,7 +2,8 @@ import pytest
 from pydantic import ValidationError
 
 from wysteria.compiler.models import WorkflowProposal
-from wysteria.evidence.models import ClaimType, EvidenceResult, EvidenceStatus
+from wysteria.evidence.models import EvidenceResult, EvidenceStatus
+from wysteria.ir.models import ClaimType
 
 
 def test_workflow_proposal_backward_compatibility():

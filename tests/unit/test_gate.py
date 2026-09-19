@@ -5,6 +5,8 @@ from wysteria.diff.models import (
     SemanticChange,
     WorkflowDiff,
 )
+from wysteria.evidence.models import EvidenceResult, EvidenceStatus
+from wysteria.policy.models import Policy
 from wysteria.reporting.gate import evaluate_gate
 from wysteria.reporting.models import (
     DeveloperReport,
@@ -91,3 +93,85 @@ def test_invalid_workflow():
     gate = evaluate_gate(ReportStatus.INVALID_WORKFLOW, None)
     assert gate.decision == GateDecision.FAIL
     assert "invalid workflow" in gate.reasons
+
+
+def test_change_policy_allowed():
+    diff = WorkflowDiff(
+        identical=False,
+        changes=[
+            SemanticChange(
+                category=ChangeCategory.CLAIM_ADDED,
+                change_type="ADDED",
+                severity=DiffSeverity.INFO,
+                explanation="claim added",
+            )
+        ],
+        summary=DiffSummary(total_changes=1, info_count=1),
+    )
+    policy = Policy(allowed_change_categories=[ChangeCategory.CLAIM_ADDED])
+    gate = evaluate_gate(ReportStatus.PASS, diff, policy=policy)
+    assert gate.decision == GateDecision.PASS
+
+
+def test_change_policy_forbidden():
+    diff = WorkflowDiff(
+        identical=False,
+        changes=[
+            SemanticChange(
+                category=ChangeCategory.NODE_ADDED,
+                change_type="ADDED",
+                severity=DiffSeverity.INFO,
+                explanation="node added",
+            )
+        ],
+        summary=DiffSummary(total_changes=1, info_count=1),
+    )
+    policy = Policy(forbidden_change_categories=[ChangeCategory.NODE_ADDED])
+    gate = evaluate_gate(ReportStatus.PASS, diff, policy=policy)
+    assert gate.decision == GateDecision.FAIL
+    assert "change category 'NODE_ADDED' is explicitly forbidden by policy" in gate.reasons
+
+
+def test_change_policy_not_allowed():
+    diff = WorkflowDiff(
+        identical=False,
+        changes=[
+            SemanticChange(
+                category=ChangeCategory.CLAIM_CHANGED,
+                change_type="CHANGED",
+                severity=DiffSeverity.INFO,
+                explanation="claim changed",
+            )
+        ],
+        summary=DiffSummary(total_changes=1, info_count=1),
+    )
+    policy = Policy(allowed_change_categories=[ChangeCategory.NODE_ADDED])
+    gate = evaluate_gate(ReportStatus.PASS, diff, policy=policy)
+    assert gate.decision == GateDecision.FAIL
+    assert "change category 'CLAIM_CHANGED' is not explicitly allowed by policy" in gate.reasons
+
+
+def test_evidence_results_in_gate():
+    diff = WorkflowDiff(identical=True)
+    ev_verified = EvidenceResult(claim_id="c1", status=EvidenceStatus.VERIFIED)
+    ev_failed = EvidenceResult(claim_id="c2", status=EvidenceStatus.FAILED)
+    ev_blocked = EvidenceResult(claim_id="c3", status=EvidenceStatus.BLOCKED)
+    ev_needs = EvidenceResult(claim_id="c4", status=EvidenceStatus.NEEDS_EVIDENCE)
+    ev_unv = EvidenceResult(claim_id="c5", status=EvidenceStatus.UNVERIFIABLE)
+
+    gate = evaluate_gate(ReportStatus.PASS, diff, evidence_results=[ev_verified])
+    assert gate.decision == GateDecision.PASS
+
+    gate_failed = evaluate_gate(ReportStatus.PASS, diff, evidence_results=[ev_failed])
+    assert gate_failed.decision == GateDecision.FAIL
+    assert "evidence claim 'c2' is failed" in gate_failed.reasons
+
+    gate_blocked = evaluate_gate(ReportStatus.PASS, diff, evidence_results=[ev_blocked])
+    assert gate_blocked.decision == GateDecision.BLOCK
+    assert "evidence claim 'c3' blocked by policy" in gate_blocked.reasons
+
+    gate_needs = evaluate_gate(ReportStatus.PASS, diff, evidence_results=[ev_needs])
+    assert gate_needs.decision == GateDecision.FAIL
+
+    gate_unv = evaluate_gate(ReportStatus.PASS, diff, evidence_results=[ev_unv])
+    assert gate_unv.decision == GateDecision.FAIL

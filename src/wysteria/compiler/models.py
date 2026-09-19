@@ -5,8 +5,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
-from wysteria.evidence.models import Claim
-from wysteria.ir.models import _enum_value
+from wysteria.ir.models import Claim, _enum_value
 
 CURRENT_PROPOSAL_VERSION = 1
 

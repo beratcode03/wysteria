@@ -686,7 +686,8 @@ def test_public_api_report_exports():
 
 
 def test_evidence_verification_reporting():
-    from wysteria.evidence.models import ClaimType, EvidenceResult, EvidenceStatus
+    from wysteria.evidence.models import EvidenceResult, EvidenceStatus
+    from wysteria.ir.models import ClaimType
 
     wf = _parse_wf(SAMPLE_WORKFLOW_TEXT)
     fix = _parse_fix(HAPPY_FIXTURE_TEXT)

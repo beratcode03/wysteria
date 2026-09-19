@@ -1,9 +1,10 @@
 import json
 from datetime import UTC, datetime
 
-from wysteria.evidence.models import Claim, ClaimType, EvidenceStatus
+from wysteria.evidence.models import EvidenceStatus
 from wysteria.evidence.snapshot import EvidenceSnapshot
 from wysteria.evidence.verifier import verify_claim
+from wysteria.ir.models import Claim, ClaimType
 
 
 def test_verify_claim_no_snapshot():

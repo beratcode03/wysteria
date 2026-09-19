@@ -6,8 +6,9 @@ import json
 import re
 from typing import Any
 
-from wysteria.evidence.models import Claim, ClaimType, EvidenceResult, EvidenceStatus
+from wysteria.evidence.models import EvidenceResult, EvidenceStatus
 from wysteria.evidence.snapshot import EvidenceSnapshot
+from wysteria.ir.models import Claim, ClaimType
 
 
 class UnsupportedSchemaError(Exception):
